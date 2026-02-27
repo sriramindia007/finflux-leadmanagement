@@ -31,13 +31,13 @@ export default function TopNav({ user, onUserChange }) {
       <div style={styles.logo}>
         <span style={styles.logoIcon}>⬡</span>
         <span style={styles.logoText}>finflux</span>
+        <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.15)', marginLeft: 8 }} />
       </div>
       <div style={styles.items}>
         {NAV_ITEMS.map(item => {
           const active = pathname.startsWith(item.path);
           return (
             <Link key={item.path} to={item.path} style={{ ...styles.item, ...(active ? styles.itemActive : {}) }}>
-              {active && <span style={styles.dot}>●</span>}
               {item.label}
             </Link>
           );
@@ -113,14 +113,13 @@ export default function TopNav({ user, onUserChange }) {
 }
 
 const styles = {
-  nav: { display: 'flex', alignItems: 'center', height: 52, backgroundColor: '#003366', paddingInline: 20, gap: 32, position: 'sticky', top: 0, zIndex: 100 },
-  logo: { display: 'flex', alignItems: 'center', gap: 6, marginRight: 16 },
-  logoIcon: { fontSize: 20, color: '#2196F3' },
+  nav: { display: 'flex', alignItems: 'center', height: 52, backgroundColor: '#2D4F7E', paddingInline: 20, gap: 24, position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' },
+  logo: { display: 'flex', alignItems: 'center', gap: 6, marginRight: 8, flexShrink: 0 },
+  logoIcon: { fontSize: 20, color: '#4FB3FF' },
   logoText: { color: '#FFFFFF', fontSize: 16, fontWeight: 700, letterSpacing: 1 },
-  items: { display: 'flex', alignItems: 'center', gap: 4, flex: 1 },
-  item: { display: 'flex', alignItems: 'center', gap: 4, color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: 500, padding: '6px 12px', borderRadius: 4, textDecoration: 'none', transition: 'color 0.15s' },
-  itemActive: { color: '#FFFFFF', fontWeight: 600 },
-  dot: { fontSize: 8, color: '#2196F3' },
-  actions: { display: 'flex', gap: 8, alignItems: 'center' },
-  iconBtn: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'rgba(255,255,255,0.75)', padding: 4 },
+  items: { display: 'flex', alignItems: 'stretch', gap: 0, flex: 1, height: '100%' },
+  item: { display: 'flex', alignItems: 'center', color: 'rgba(255,255,255,0.65)', fontSize: 13, fontWeight: 500, padding: '0 14px', textDecoration: 'none', borderBottom: '2px solid transparent', transition: 'color 0.15s', whiteSpace: 'nowrap' },
+  itemActive: { color: '#FFFFFF', fontWeight: 600, borderBottom: '2px solid #fff' },
+  actions: { display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 },
+  iconBtn: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'rgba(255,255,255,0.65)', padding: 4 },
 };

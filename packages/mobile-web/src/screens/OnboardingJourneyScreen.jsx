@@ -3,6 +3,26 @@ import { c, card } from '../theme';
 import { api } from '../services/api';
 import StatusBadge from '../components/StatusBadge';
 
+const DoneIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="11" fill="#10B981" />
+    <polyline points="7 12 10.5 15.5 17 9" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+const ActiveIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="11" fill="#FA8D29" opacity="0.15" />
+    <circle cx="12" cy="12" r="11" stroke="#FA8D29" strokeWidth="1.5" />
+    <polyline points="12 7 12 12 15 14" stroke="#FA8D29" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+const PendingIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="11" stroke="#CFD6DD" strokeWidth="1.5" />
+    <circle cx="12" cy="12" r="3" fill="#CFD6DD" />
+  </svg>
+);
+
 function StepRow({ step, onComplete, userRole }) {
   const done   = step.status === 'completed';
   const active = step.status === 'in_progress';
@@ -16,8 +36,8 @@ function StepRow({ step, onComplete, userRole }) {
       onClick={() => canTap && onComplete(step)}
       style={{ ...card, display: 'flex', alignItems: 'center', gap: 12, cursor: canTap ? 'pointer' : 'default', opacity: pending ? 0.5 : 1 }}
     >
-      <span style={{ fontSize: 22, color: done ? c.stepDone : active ? c.stepActive : c.stepPending }}>
-        {done ? '✅' : active ? '🕐' : '⏰'}
+      <span style={{ flexShrink: 0 }}>
+        {done ? <DoneIcon /> : active ? <ActiveIcon /> : <PendingIcon />}
       </span>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: done ? c.stepDone : active ? c.stepActive : c.textMuted }}>{step.name}</div>

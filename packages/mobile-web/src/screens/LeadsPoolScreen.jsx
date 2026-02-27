@@ -37,23 +37,34 @@ export default function LeadsPoolScreen({ navigate }) {
       <div style={{ flex:1, overflowY:'auto', padding:'0 16px', paddingBottom:80 }}>
         {loading ? <div style={{ textAlign:'center', paddingTop:40, color:c.textMuted }}>Loading...</div>
           : leads.length === 0 ? <div style={{ textAlign:'center', paddingTop:40, color:c.textMuted }}>No leads found</div>
-          : leads.map(lead => (
-            <div key={lead.id} style={{ ...card, cursor:'pointer' }} onClick={() => navigate('journey', lead)}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:15, fontWeight:700, color:c.navy }}>{lead.name}</div>
-                  <div style={{ fontSize:13, color:c.textSecondary, margin:'2px 0 4px' }}>{lead.leadType} Lead</div>
-                  {lead.locality && <div style={{ fontSize:12, color:c.textSecondary, marginBottom:4 }}>Area: {lead.locality}</div>}
-                  {lead.status === 'APPROVED' && lead.assignedTo && <div style={{ fontSize:12, color:c.textSecondary, marginBottom:4 }}>Assigned to you by BM</div>}
-                  <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:6 }}>
-                    <StatusBadge status={lead.status} />
-                    {lead.status === 'CONVERTED' && <span style={{ color:c.converted, fontWeight:700, fontSize:14 }}>+800</span>}
+          : leads.map(lead => {
+            const borderColor = {
+              APPROVAL_PENDING: c.pending,
+              QUALIFIED:        c.qualified,
+              CONVERTED:        c.converted,
+              APPROVED:         c.approved,
+              REJECTED:         c.rejected,
+              NOT_CONVERTED:    c.textMuted,
+            }[lead.status] || c.border;
+            return (
+              <div key={lead.id} style={{ ...card, cursor:'pointer', borderLeft:`4px solid ${borderColor}`, paddingLeft:12 }} onClick={() => navigate('journey', lead)}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:15, fontWeight:700, color:c.navy }}>{lead.name}</div>
+                    <div style={{ fontSize:12, color:c.textSecondary, margin:'3px 0 6px' }}>
+                      {lead.leadType} Lead{lead.source ? ` · ${lead.source}` : ''}{lead.locality ? ` · ${lead.locality}` : ''}
+                    </div>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <StatusBadge status={lead.status} />
+                      {lead.status === 'CONVERTED' && <span style={{ color:c.converted, fontWeight:700, fontSize:13 }}>+₹800</span>}
+                      {lead.status === 'APPROVAL_PENDING' && <span style={{ fontSize:11, color:c.pending }}>Awaiting hub review</span>}
+                    </div>
                   </div>
+                  <span style={{ color:c.textMuted, fontSize:20, marginLeft:8 }}>›</span>
                 </div>
-                <span style={{ color:c.textMuted, fontSize:18 }}>›</span>
               </div>
-            </div>
-          ))}
+            );
+          })}
       </div>
 
       {/* FAB */}

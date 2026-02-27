@@ -22,6 +22,7 @@ export default function LeadsPoolPage() {
   const [showNewLead, setShowNewLead] = useState(false);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [page, setPage] = useState(1);
+  const [hoveredRow, setHoveredRow] = useState(null);
   const PER_PAGE = 10;
 
   const load = useCallback(async () => {
@@ -63,13 +64,15 @@ export default function LeadsPoolPage() {
         </div>
       </div>
 
-      <p style={{ fontSize: 12, color: '#6B7280', marginBottom: 8 }}>Displaying {leads.length} results</p>
+      <p style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 8 }}>
+        {loading ? 'Loading...' : `${leads.length} lead${leads.length !== 1 ? 's' : ''} found`}
+      </p>
 
       {/* Table */}
       <div style={s.tableWrap}>
         <table style={s.table}>
           <thead>
-            <tr style={s.thead}>
+            <tr>
               {['Created on','Created by','Source','Lead ID','Customer Name','State','Assignee','Status'].map(h => (
                 <th key={h} style={s.th}>{h}</th>
               ))}
@@ -77,18 +80,25 @@ export default function LeadsPoolPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8} style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>Loading...</td></tr>
+              <tr><td colSpan={8} style={{ textAlign: 'center', padding: 48, color: '#9CA3AF' }}>Loading...</td></tr>
             ) : paged.length === 0 ? (
-              <tr><td colSpan={8} style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>No leads found</td></tr>
+              <tr><td colSpan={8} style={{ textAlign: 'center', padding: 48, color: '#9CA3AF' }}>No leads found</td></tr>
             ) : paged.map(lead => (
-              <tr key={lead.id} style={s.tr} onClick={() => navigate(`/leads/${lead.id}`)} title="Click to view lead">
-                <td style={s.td}><span style={{ whiteSpace: 'pre-line', fontSize: 12 }}>{fmt(lead.createdAt)}</span></td>
+              <tr
+                key={lead.id}
+                style={{ ...s.tr, background: hoveredRow === lead.id ? '#F0F5FF' : '#fff' }}
+                onMouseEnter={() => setHoveredRow(lead.id)}
+                onMouseLeave={() => setHoveredRow(null)}
+                onClick={() => navigate(`/leads/${lead.id}`)}
+                title="Click to view lead"
+              >
+                <td style={s.td}><span style={{ whiteSpace: 'pre-line', fontSize: 12, color: '#6B7280' }}>{fmt(lead.createdAt)}</span></td>
                 <td style={s.td}>{lead.createdBy}</td>
-                <td style={s.td}>{lead.source}</td>
-                <td style={s.td}><span style={{ fontFamily: 'monospace', fontSize: 12 }}>{lead.id}</span></td>
+                <td style={s.td}>{lead.source || '—'}</td>
+                <td style={s.td}><span style={{ fontFamily: 'monospace', fontSize: 11, color: '#9CA3AF' }}>{lead.id}</span></td>
                 <td style={{ ...s.td, fontWeight: 600, color: '#003366' }}>{lead.name}</td>
                 <td style={s.td}>{lead.state || '—'}</td>
-                <td style={s.td}>{lead.assignedTo || '—'}</td>
+                <td style={s.td}>{lead.assignedTo || <span style={{ color: '#CFD6DD' }}>Unassigned</span>}</td>
                 <td style={s.td}><StatusBadge status={lead.status} small /></td>
               </tr>
             ))}
@@ -98,11 +108,15 @@ export default function LeadsPoolPage() {
 
       {/* Pagination */}
       <div style={s.pagination}>
-        <span style={{ fontSize: 13, color: '#6B7280' }}>Items per page: {PER_PAGE} &nbsp; {leads.length === 0 ? '0' : `${(page-1)*PER_PAGE+1}-${Math.min(page*PER_PAGE, leads.length)}`} of {leads.length}</span>
+        <span style={{ fontSize: 13, color: '#6B7280' }}>
+          Items per page: {PER_PAGE} &nbsp;
+          {leads.length === 0 ? '0' : `${(page-1)*PER_PAGE+1}–${Math.min(page*PER_PAGE, leads.length)}`} of {leads.length}
+        </span>
         <div style={{ display: 'flex', gap: 4 }}>
+          <button style={s.pageBtn} onClick={() => setPage(1)} disabled={page === 1}>«</button>
           <button style={s.pageBtn} onClick={() => setPage(p => Math.max(1, p-1))} disabled={page === 1}>‹</button>
-          <button style={s.pageBtn} onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page === totalPages}>›</button>
-          <button style={s.pageBtn} onClick={() => setPage(totalPages)} disabled={page === totalPages}>»</button>
+          <button style={s.pageBtn} onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page === totalPages || totalPages === 0}>›</button>
+          <button style={s.pageBtn} onClick={() => setPage(totalPages)} disabled={page === totalPages || totalPages === 0}>»</button>
         </div>
       </div>
 
@@ -119,17 +133,16 @@ const s = {
   typeTabActive: { color: '#1874D0', fontWeight: 600, borderBottom: '2px solid #1874D0' },
   filterRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 },
   filterPills: { display: 'flex', gap: 6, flexWrap: 'wrap' },
-  pill: { padding: '5px 14px', borderRadius: 999, border: '1px solid #CFD6DD', background: '#fff', fontSize: 13, color: '#374151', cursor: 'pointer', fontWeight: 400 },
-  pillActive: { background: '#003366', color: '#fff', borderColor: '#003366', fontWeight: 600 },
-  filterBtn: { padding: '7px 14px', border: '1px solid #CFD6DD', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: 13, color: '#374151' },
-  bulkBtn: { padding: '7px 14px', border: '1px solid #1874D0', borderRadius: 4, background: '#fff', color: '#1874D0', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
-  newLeadBtn: { padding: '7px 16px', border: 'none', borderRadius: 4, background: '#1874D0', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
-  tableWrap: { background: '#fff', borderRadius: 8, border: '1px solid #E5E7EB', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' },
+  pill: { padding: '5px 14px', borderRadius: 999, border: '1px solid #CFD6DD', background: '#fff', fontSize: 13, color: '#6B7280', cursor: 'pointer', fontWeight: 400, transition: 'all 0.15s' },
+  pillActive: { background: '#EBF5FF', color: '#1874D0', borderColor: '#1874D0', fontWeight: 600 },
+  filterBtn: { padding: '7px 14px', border: '1px solid #CFD6DD', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 13, color: '#374151' },
+  bulkBtn: { padding: '7px 14px', border: '1px solid #1874D0', borderRadius: 6, background: '#fff', color: '#1874D0', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
+  newLeadBtn: { padding: '7px 16px', border: 'none', borderRadius: 6, background: '#1874D0', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
+  tableWrap: { background: '#fff', borderRadius: 8, border: '1px solid #E5E7EB', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' },
   table: { width: '100%', borderCollapse: 'collapse' },
-  thead: { background: '#F9FAFB' },
-  th: { padding: '10px 12px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: '#5F6368', textTransform: 'uppercase', letterSpacing: 0.5, borderBottom: '1px solid #E5E7EB' },
-  tr: { cursor: 'pointer', transition: 'background 0.1s' },
-  td: { padding: '11px 12px', fontSize: 13, color: '#374151', borderBottom: '1px solid #F3F4F6' },
-  pagination: { display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 12 },
-  pageBtn: { padding: '4px 10px', border: '1px solid #CFD6DD', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: 14, color: '#374151' },
+  th: { padding: '10px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.6, borderBottom: '1px solid #E5E7EB', background: '#F9FAFB' },
+  tr: { cursor: 'pointer', transition: 'background 0.12s' },
+  td: { padding: '12px 12px', fontSize: 13, color: '#374151', borderBottom: '1px solid #F3F4F6' },
+  pagination: { display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 14 },
+  pageBtn: { padding: '4px 10px', border: '1px solid #E5E7EB', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: 13, color: '#6B7280' },
 };
