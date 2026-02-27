@@ -1,0 +1,122 @@
+{
+  "alias": [
+    "finflux-leadmanagement-mobile-srirams-projects-08741674.vercel.app"
+  ],
+  "aliasAssigned": false,
+  "automaticAliases": [
+    "finflux-leadmanagement-mobile-srirams-projects-08741674.vercel.app"
+  ],
+  "bootedAt": 1772070372226,
+  "buildingAt": 1772070372226,
+  "buildSkipped": false,
+  "createdAt": 1772070372226,
+  "creator": {
+    "uid": "aufiIMzQwADH53Vgov8BtSiP",
+    "username": "sriramindia007-7721"
+  },
+  "id": "dpl_9U2Si6aQiKVBzGspQMnaWqQVj85G",
+  "name": "finflux-leadmanagement-mobile",
+  "meta": {},
+  "originCacheRegion": "iad1",
+  "project": {
+    "id": "prj_5pdJWawEjVzLafvrdUuon2y78K0P",
+    "name": "finflux-leadmanagement-mobile",
+    "framework": null
+  },
+  "public": true,
+  "readyState": "INITIALIZING",
+  "regions": [
+    "iad1"
+  ],
+  "status": "INITIALIZING",
+  "target": "production",
+  "team": {
+    "id": "team_X2yI1WYE75we57iGRCsT9haG",
+    "name": "sriram's projects",
+    "slug": "srirams-projects-08741674"
+  },
+  "type": "LAMBDAS",
+  "url": "finflux-leadmanagement-mobile-go6dg41sk.vercel.app",
+  "version": 2,
+  "previewCommentsEnabled": true,
+  "oidcTokenClaims": {
+    "sub": "owner:srirams-projects-08741674:project:finflux-leadmanagement-mobile:environment:production",
+    "iss": "https://oidc.vercel.com/srirams-projects-08741674",
+    "scope": "owner:srirams-projects-08741674:project:finflux-leadmanagement-mobile:environment:production",
+    "aud": "https://vercel.com/srirams-projects-08741674",
+    "owner": "srirams-projects-08741674",
+    "owner_id": "team_X2yI1WYE75we57iGRCsT9haG",
+    "project": "finflux-leadmanagement-mobile",
+    "project_id": "prj_5pdJWawEjVzLafvrdUuon2y78K0P",
+    "environment": "production",
+    "plan": "hobby"
+  },
+  "nodeVersion": "20.x",
+  "lambdas": [
+    {
+      "id": "bld_pts7pcru9",
+      "createdAt": 1772070372516,
+      "entrypoint": ".",
+      "readyState": "READY",
+      "readyStateAt": 1772070372516,
+      "output": []
+    }
+  ],
+  "aliasAssignedAt": null,
+  "build": {
+    "env": []
+  },
+  "builds": [],
+  "createdIn": "sfo1",
+  "env": [],
+  "functions": null,
+  "inspectorUrl": "https://vercel.com/srirams-projects-08741674/finflux-leadmanagement-mobile/9U2Si6aQiKVBzGspQMnaWqQVj85G",
+  "isInConcurrentBuildsQueue": false,
+  "isInSystemBuildsQueue": true,
+  "ownerId": "team_X2yI1WYE75we57iGRCsT9haG",
+  "plan": "hobby",
+  "projectId": "prj_5pdJWawEjVzLafvrdUuon2y78K0P",
+  "projectSettings": {
+    "buildCommand": "",
+    "devCommand": null,
+    "framework": null,
+    "commandForIgnoringBuildStep": null,
+    "installCommand": "",
+    "outputDirectory": "",
+    "speedInsights": {
+      "id": "fmGtH1UuwLs1SWvRClR2HmmzIIH",
+      "hasData": false
+    },
+    "webAnalytics": {
+      "id": "onWzyNVtYFe7AjBdUvvAh43Bj"
+    },
+    "nodeVersion": "24.x"
+  },
+  "routes": [
+    {
+      "src": "^/api/(.*)$",
+      "dest": "/api/server"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "^/(.*)$",
+      "dest": "/index.html"
+    }
+  ],
+  "config": {
+    "version": 1,
+    "secureComputePrimaryRegion": null,
+    "secureComputeFallbackRegion": null,
+    "functionTimeout": 300,
+    "functionType": "fluid",
+    "functionMemoryType": "standard",
+    "isUsingActiveCPU": true,
+    "resourceConfig": {
+      "buildQueue": {
+        "configuration": "SKIP_NAMESPACE_QUEUE"
+      }
+    }
+  }
+}

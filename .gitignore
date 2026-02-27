@@ -1,0 +1,20 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+
+# Android build outputs
+packages/mobile-web/android/app/build/
+packages/mobile-web/android/.gradle/
+packages/mobile-web/android/build/
+packages/mobile-web/.gradle-home/
+
+# Keystore — NEVER commit these
+packages/mobile-web/android/app/*.keystore
+packages/mobile-web/android/app/*.jks
+packages/mobile-web/android/keystore.properties
+
+# Capacitor generated
+packages/mobile-web/android/app/src/main/assets/public/
+packages/mobile-web/android/capacitor-cordova-android-plugins/

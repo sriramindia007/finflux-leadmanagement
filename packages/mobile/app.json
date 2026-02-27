@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "Finflux Lead Management",
+    "slug": "finflux-leadmanagement",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": { "resizeMode": "contain", "backgroundColor": "#003366" },
+    "ios": { "supportsTablet": false },
+    "android": { "adaptiveIcon": { "backgroundColor": "#003366" } },
+    "web": { "favicon": "./assets/favicon.png" }
+  }
+}
