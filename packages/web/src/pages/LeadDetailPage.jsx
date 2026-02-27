@@ -297,11 +297,18 @@ export default function LeadDetailPage() {
   const allStepsDone  = lead.steps?.every(s => s.status === 'completed');
   const canConvert    = lead.status === 'QUALIFIED' && allStepsDone;
   // Follow-up validation
-  const hasCallLog        = (lead.callLogs?.length || 0) > 0;
-  const sortedLogs        = [...(lead.callLogs || [])].sort((a, b) => new Date(a.calledAt) - new Date(b.calledAt));
-  const lastLog           = sortedLogs[sortedLogs.length - 1];
-  const hasPendingFollowUp = !!lastLog?.followUpAt;          // last call log has a scheduled follow-up not yet resolved
-  const canApprove        = hasCallLog && !hasPendingFollowUp;
+  const hasCallLog   = (lead.callLogs?.length || 0) > 0;
+  const sortedLogs   = [...(lead.callLogs || [])].sort((a, b) => new Date(a.calledAt) - new Date(b.calledAt));
+  // A followUpAt is resolved only when a SUBSEQUENT call log exists with calledAt >= followUpAt date.
+  // This covers both future dates (impossible to resolve yet) and overdue past dates (no log recorded).
+  const pendingFollowUpLog = sortedLogs.find(log => {
+    if (!log.followUpAt) return false;
+    const due = new Date(log.followUpAt);
+    return !sortedLogs.some(l => l !== log && new Date(l.calledAt) >= due);
+  }) || null;
+  const hasPendingFollowUp  = !!pendingFollowUpLog;
+  const followUpIsFuture    = hasPendingFollowUp && new Date(pendingFollowUpLog.followUpAt) > new Date();
+  const canApprove          = hasCallLog && !hasPendingFollowUp;
 
   const basicData = {
     Mobile: lead.mobile,
@@ -397,18 +404,21 @@ export default function LeadDetailPage() {
 
           {/* Banner: pending follow-up not yet resolved */}
           {lead.status === 'APPROVAL_PENDING' && hasCallLog && hasPendingFollowUp && (
-            <div style={{ background: '#FEF3C7', border: '1.5px solid #F59E0B', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-              <span style={{ fontSize: 20, flexShrink: 0 }}>⏰</span>
+            <div style={{ background: followUpIsFuture ? '#EFF6FF' : '#FEF3C7', border: `1.5px solid ${followUpIsFuture ? '#93C5FD' : '#F59E0B'}`, borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+              <span style={{ fontSize: 20, flexShrink: 0 }}>{followUpIsFuture ? '📅' : '⏰'}</span>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#92400E' }}>Follow-up pending — cannot approve yet</div>
-                <div style={{ fontSize: 13, color: '#78350F', marginTop: 4 }}>
-                  The last call log has a scheduled follow-up on{' '}
-                  <strong>{new Date(lastLog.followUpAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</strong>.
-                  Record a new call log after completing the follow-up to proceed with approval.
+                <div style={{ fontSize: 14, fontWeight: 700, color: followUpIsFuture ? '#1E40AF' : '#92400E' }}>
+                  {followUpIsFuture ? 'Follow-up scheduled — cannot approve yet' : 'Follow-up overdue — log the call to proceed'}
+                </div>
+                <div style={{ fontSize: 13, color: followUpIsFuture ? '#1D4ED8' : '#78350F', marginTop: 4 }}>
+                  {followUpIsFuture
+                    ? <>Follow-up call due on <strong>{new Date(pendingFollowUpLog.followUpAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</strong>. Once you have made the follow-up call, add a new call log to unlock approval.</>
+                    : <>Follow-up was due on <strong>{new Date(pendingFollowUpLog.followUpAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</strong>. Record what happened in a new call log to proceed with approval.</>
+                  }
                 </div>
                 <button
                   onClick={() => setShowCallLog(true)}
-                  style={{ marginTop: 8, padding: '6px 14px', background: '#F59E0B', border: 'none', borderRadius: 6, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                  style={{ marginTop: 8, padding: '6px 14px', background: followUpIsFuture ? '#3B82F6' : '#F59E0B', border: 'none', borderRadius: 6, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
                 >
                   + Add Follow-up Call Log
                 </button>
@@ -487,7 +497,7 @@ export default function LeadDetailPage() {
             title={!hasCallLog ? 'Add a call log first' : hasPendingFollowUp ? 'Complete the scheduled follow-up first' : ''}
             style={{ ...s.footerBtn, background: actioning || !canApprove ? '#9CA3AF' : '#1874D0', color: '#fff', border: 'none', cursor: !canApprove ? 'not-allowed' : 'pointer' }}
           >
-            {actioning ? 'Approving...' : !hasCallLog ? 'Call Log Required' : hasPendingFollowUp ? 'Follow-up Pending' : 'Approve Lead'}
+            {actioning ? 'Approving...' : !hasCallLog ? 'Call Log Required' : hasPendingFollowUp ? (followUpIsFuture ? 'Follow-up Pending' : 'Follow-up Overdue') : 'Approve Lead'}
           </button>
         )}
         {lead.status === 'QUALIFIED' && !canConvert && !isMeetLeadActive && (
