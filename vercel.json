@@ -1,0 +1,8 @@
+{
+  "buildCommand": "npm install --prefix packages/web && npm run build --prefix packages/web",
+  "outputDirectory": "packages/web/dist",
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/backend" },
+    { "source": "/((?!api).*)", "destination": "/index.html" }
+  ]
+}

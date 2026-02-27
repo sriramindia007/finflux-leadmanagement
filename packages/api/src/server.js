@@ -278,9 +278,13 @@ app.patch('/api/leads/:id/steps/:stepId', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`\n🚀 Finflux Lead API running at http://localhost:${PORT}`);
-  console.log(`   GET  http://localhost:${PORT}/api/leads`);
-  console.log(`   POST http://localhost:${PORT}/api/leads`);
-  console.log(`   GET  http://localhost:${PORT}/api/leads/stats\n`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`\n🚀 Finflux Lead API running at http://localhost:${PORT}`);
+    console.log(`   GET  http://localhost:${PORT}/api/leads`);
+    console.log(`   POST http://localhost:${PORT}/api/leads`);
+    console.log(`   GET  http://localhost:${PORT}/api/leads/stats\n`);
+  });
+}
+
+module.exports = app;
