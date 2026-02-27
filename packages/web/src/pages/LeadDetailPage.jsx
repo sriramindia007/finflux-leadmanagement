@@ -296,8 +296,12 @@ export default function LeadDetailPage() {
   const isMeetLeadActive = lead.steps?.find(s => s.status === 'in_progress')?.name === 'Meet Lead';
   const allStepsDone  = lead.steps?.every(s => s.status === 'completed');
   const canConvert    = lead.status === 'QUALIFIED' && allStepsDone;
-  // Follow-up validation: at least one call log required before approval
-  const hasFollowUp   = (lead.callLogs?.length || 0) > 0;
+  // Follow-up validation
+  const hasCallLog        = (lead.callLogs?.length || 0) > 0;
+  const sortedLogs        = [...(lead.callLogs || [])].sort((a, b) => new Date(a.calledAt) - new Date(b.calledAt));
+  const lastLog           = sortedLogs[sortedLogs.length - 1];
+  const hasPendingFollowUp = !!lastLog?.followUpAt;          // last call log has a scheduled follow-up not yet resolved
+  const canApprove        = hasCallLog && !hasPendingFollowUp;
 
   const basicData = {
     Mobile: lead.mobile,
@@ -372,12 +376,12 @@ export default function LeadDetailPage() {
             </div>
           </div>
 
-          {/* Follow-up validation banner — shown when no call log exists and pending approval */}
-          {lead.status === 'APPROVAL_PENDING' && !hasFollowUp && (
+          {/* Banner: no call log yet */}
+          {lead.status === 'APPROVAL_PENDING' && !hasCallLog && (
             <div style={{ background: '#FEF3C7', border: '1.5px solid #F59E0B', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
               <span style={{ fontSize: 20, flexShrink: 0 }}>⚠️</span>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#92400E' }}>Follow-up required before approval</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#92400E' }}>Call log required before approval</div>
                 <div style={{ fontSize: 13, color: '#78350F', marginTop: 4 }}>
                   At least one call log must be recorded to confirm contact with the customer before this lead can be approved.
                 </div>
@@ -386,6 +390,27 @@ export default function LeadDetailPage() {
                   style={{ marginTop: 8, padding: '6px 14px', background: '#F59E0B', border: 'none', borderRadius: 6, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
                 >
                   + Add Call Log
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Banner: pending follow-up not yet resolved */}
+          {lead.status === 'APPROVAL_PENDING' && hasCallLog && hasPendingFollowUp && (
+            <div style={{ background: '#FEF3C7', border: '1.5px solid #F59E0B', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+              <span style={{ fontSize: 20, flexShrink: 0 }}>⏰</span>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#92400E' }}>Follow-up pending — cannot approve yet</div>
+                <div style={{ fontSize: 13, color: '#78350F', marginTop: 4 }}>
+                  The last call log has a scheduled follow-up on{' '}
+                  <strong>{new Date(lastLog.followUpAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</strong>.
+                  Record a new call log after completing the follow-up to proceed with approval.
+                </div>
+                <button
+                  onClick={() => setShowCallLog(true)}
+                  style={{ marginTop: 8, padding: '6px 14px', background: '#F59E0B', border: 'none', borderRadius: 6, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  + Add Follow-up Call Log
                 </button>
               </div>
             </div>
@@ -458,11 +483,11 @@ export default function LeadDetailPage() {
         {lead.status === 'APPROVAL_PENDING' && (
           <button
             onClick={handleApprove}
-            disabled={actioning || !hasFollowUp}
-            title={!hasFollowUp ? 'Add a call log first to confirm follow-up' : ''}
-            style={{ ...s.footerBtn, background: actioning || !hasFollowUp ? '#9CA3AF' : '#1874D0', color: '#fff', border: 'none', cursor: !hasFollowUp ? 'not-allowed' : 'pointer' }}
+            disabled={actioning || !canApprove}
+            title={!hasCallLog ? 'Add a call log first' : hasPendingFollowUp ? 'Complete the scheduled follow-up first' : ''}
+            style={{ ...s.footerBtn, background: actioning || !canApprove ? '#9CA3AF' : '#1874D0', color: '#fff', border: 'none', cursor: !canApprove ? 'not-allowed' : 'pointer' }}
           >
-            {actioning ? 'Approving...' : !hasFollowUp ? 'Follow-up Required' : 'Approve Lead'}
+            {actioning ? 'Approving...' : !hasCallLog ? 'Call Log Required' : hasPendingFollowUp ? 'Follow-up Pending' : 'Approve Lead'}
           </button>
         )}
         {lead.status === 'QUALIFIED' && !canConvert && !isMeetLeadActive && (
