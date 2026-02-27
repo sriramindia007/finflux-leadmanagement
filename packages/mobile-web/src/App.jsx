@@ -9,12 +9,32 @@ import SchedulerScreen from './screens/SchedulerScreen';
 const OFFICERS = ['Ravi Kumar', 'Jagan', 'Sameer', 'Amul', 'Gopal', 'Mohan'];
 const DEFAULT_USER = { name: 'Ravi Kumar', role: 'FIELD_OFFICER' };
 
+const HomeIcon = ({ active }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? '#2196F3' : 'none'} stroke={active ? '#2196F3' : '#9CA3AF'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+  </svg>
+);
+const SearchIcon = ({ active }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? '#2196F3' : '#9CA3AF'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  </svg>
+);
+const CalIcon = ({ active }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? '#2196F3' : '#9CA3AF'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+  </svg>
+);
+const ProfileIcon = ({ active }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? '#2196F3' : '#9CA3AF'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+  </svg>
+);
+
 const BOTTOM_NAV = [
-  { key:'home', icon:'🏠', label:'Home' },
-  { key:'leads', icon:'👥', label:'Leads' },
-  { key:'search', icon:'🔍', label:'Search' },
-  { key:'metrics', icon:'🗓️', label:'Schedule' },
-  { key:'profile', icon:'👤', label:'Profile' },
+  { key:'home',    Icon: HomeIcon,    label:'Home' },
+  { key:'search',  Icon: SearchIcon,  label:'Search' },
+  { key:'metrics', Icon: CalIcon,     label:'Schedule' },
+  { key:'profile', Icon: ProfileIcon, label:'Profile' },
 ];
 
 export default function App() {
@@ -32,7 +52,7 @@ export default function App() {
 
   const navigate = (to, p = null) => { setScreen(to); setParams(p); };
 
-  const showBottomNav = ['home','leads','search','metrics','profile'].includes(screen);
+  const showBottomNav = ['home','search','metrics','profile'].includes(screen);
 
   const renderProfile = () => (
     <div style={{ height:'100%', display:'flex', flexDirection:'column', background:'#F5F6FA', padding: 24 }}>
@@ -95,10 +115,10 @@ export default function App() {
       {showBottomNav && (
         <div style={{ display:'flex', background:'#fff', borderTop:'1px solid #E8EDF2', padding:'8px 0 12px', flexShrink:0, boxShadow:'0 -2px 12px rgba(0,0,0,0.06)' }}>
           {BOTTOM_NAV.map(item => {
-            const active = screen === item.key || (item.key === 'leads' && ['leads','newlead','journey','rejection'].includes(screen));
+            const active = screen === item.key;
             return (
-              <button key={item.key} onClick={() => navigate(item.key)} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2, background:'none', border:'none', cursor:'pointer', padding:'4px 0' }}>
-                <span style={{ fontSize:20 }}>{item.icon}</span>
+              <button key={item.key} onClick={() => navigate(item.key)} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:3, background:'none', border:'none', cursor:'pointer', padding:'4px 0' }}>
+                <item.Icon active={active} />
                 <span style={{ fontSize:10, fontWeight: active ? 600 : 400, color: active ? '#2196F3' : '#9CA3AF' }}>{item.label}</span>
               </button>
             );

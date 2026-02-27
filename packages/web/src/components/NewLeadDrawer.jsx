@@ -36,7 +36,7 @@ function Field({ label, children, required, error }) {
   );
 }
 
-const baseInput = { padding: '8px 12px', borderRadius: 4, fontSize: 14, color: '#003366', outline: 'none', width: '100%', background: '#fff', boxSizing: 'border-box' };
+const baseInput = { padding: '8px 12px', borderRadius: 6, fontSize: 14, color: '#003366', outline: 'none', width: '100%', background: '#fff', boxSizing: 'border-box' };
 const inputStyle = (err) => ({ ...baseInput, border: `1px solid ${err ? '#EF4444' : '#CFD6DD'}` });
 const disabledStyle = { ...baseInput, border: '1px solid #CFD6DD', background: '#F1F3F4', color: '#9CA3AF' };
 
@@ -136,7 +136,7 @@ export default function NewLeadDrawer({ onClose, onCreated }) {
             <span style={{ fontSize: 14, fontWeight: 600, color: '#1874D0' }}>Basic Details</span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
             <Field label="Name" required error={touched.name && errors.name}>
               <input style={inputStyle(touched.name && errors.name)} value={form.name}
                 onChange={e => setAndValidate('name', e.target.value)} onBlur={() => touch('name')} placeholder="Customer name" />
@@ -175,7 +175,7 @@ export default function NewLeadDrawer({ onClose, onCreated }) {
                   </div>
                   <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                     <button onClick={() => window.open(`/leads/${dedup.lead.id}`, '_blank')} style={{ fontSize: 12, color: '#003366', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>View Existing Lead ↗</button>
-                    <button onClick={() => setProceedingAnyway(true)} style={{ fontSize: 12, color: '#92400E', background: 'none', border: '1px solid #F59E0B', borderRadius: 4, cursor: 'pointer', padding: '2px 8px' }}>Proceed Anyway</button>
+                    <button onClick={() => setProceedingAnyway(true)} style={{ fontSize: 12, color: '#92400E', background: 'none', border: '1px solid #F59E0B', borderRadius: 6, cursor: 'pointer', padding: '2px 8px' }}>Proceed Anyway</button>
                   </div>
                 </div>
               )}
@@ -257,9 +257,9 @@ export default function NewLeadDrawer({ onClose, onCreated }) {
 
         {/* Footer */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '16px 24px', borderTop: '1px solid #E5E7EB' }}>
-          <button onClick={onClose} style={{ padding: '8px 20px', border: '1px solid #CFD6DD', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: 14, color: '#374151' }}>Cancel</button>
+          <button onClick={onClose} style={{ padding: '8px 20px', border: '1px solid #CFD6DD', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 14, color: '#374151' }}>Cancel</button>
           <button onClick={handleCreate} disabled={saving || (dedup.status === 'found' && !proceedingAnyway)}
-            style={{ padding: '8px 20px', border: 'none', borderRadius: 4, background: saving || (dedup.status === 'found' && !proceedingAnyway) ? '#9CA3AF' : '#1874D0', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
+            style={{ padding: '8px 20px', border: 'none', borderRadius: 6, background: saving || (dedup.status === 'found' && !proceedingAnyway) ? '#9CA3AF' : '#1874D0', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
             {saving ? 'Creating...' : dedup.status === 'found' && !proceedingAnyway ? 'Resolve Duplicate First' : 'Create'}
           </button>
         </div>

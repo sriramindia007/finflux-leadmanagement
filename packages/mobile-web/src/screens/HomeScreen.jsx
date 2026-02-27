@@ -1,84 +1,130 @@
 import React, { useEffect, useState } from 'react';
-import { c, card } from '../theme';
+import { c } from '../theme';
 import { api } from '../services/api';
 
-const DAYS = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+const DAYS   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-function CalendarStrip() {
-  const today = new Date();
-  const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(today); d.setDate(today.getDate() - 3 + i); return { date: d.getDate(), day: DAYS[d.getDay()], isToday: i === 3 }; });
-  return (
-    <div style={{ display:'flex', justifyContent:'space-around', padding:'8px 16px 12px' }}>
-      {days.map((d,i) => (
-        <div key={i} style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'6px 8px', borderRadius: d.isToday ? 10 : 6, background: d.isToday ? c.primary : 'transparent' }}>
-          <span style={{ fontSize:10, fontWeight:500, color: d.isToday ? '#fff' : c.textSecondary }}>{d.day}</span>
-          <span style={{ fontSize:14, fontWeight:700, color: d.isToday ? '#fff' : c.navy, marginTop:2 }}>{d.date}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
+// Mock upcoming tasks — replace with API call when available
+const MOCK_TASKS = [
+  { center: 'Vidyapura Center 1', time: '07:00 AM', type: 'Collection' },
+  { center: 'Vidyapura Center 1', time: '09:00 AM', type: 'Collection' },
+];
 
-function DashCard({ label, count, sub, amount, amountSub, btnLabel, bg, onPress, icon }) {
-  return (
-    <div style={{ ...card, background: bg, minWidth:180, flex:'0 0 auto' }}>
-      <div style={{ fontSize:28, marginBottom:6 }}>{icon}</div>
-      <p style={{ fontSize:13, fontWeight:600, color:c.navy, marginBottom:10 }}>{label}</p>
-      <div style={{ display:'flex', gap:16, marginBottom:12 }}>
-        <div><div style={{ fontSize:18, fontWeight:700, color:c.navy }}>{count}</div><div style={{ fontSize:11, color:c.textSecondary }}>{sub}</div></div>
-        {amount != null && <div><div style={{ fontSize:18, fontWeight:700, color:c.navy }}>₹{amount.toLocaleString('en-IN')}</div><div style={{ fontSize:11, color:c.textSecondary }}>{amountSub}</div></div>}
-      </div>
-      <button onClick={onPress} style={{ padding:'8px 16px', borderRadius:40, background:c.primary, color:'#fff', border:'none', fontSize:12, fontWeight:600, cursor:'pointer' }}>{btnLabel} →</button>
-    </div>
-  );
-}
+const CalendarIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1874D0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+  </svg>
+);
+const PersonIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+  </svg>
+);
+const ThumbsUpIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/>
+    <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+  </svg>
+);
+const LocationIcon = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#FA8D29" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="10" r="3"/>
+    <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 13 8 13s8-7.75 8-13a8 8 0 0 0-8-8z"/>
+  </svg>
+);
 
 export default function HomeScreen({ navigate, user }) {
-  const [stats, setStats] = useState({ pending: 0, qualified: 0, converted: 0, total: 0 });
-  useEffect(() => { api.getStats().then(setStats).catch(() => {}); }, []);
-  const today = new Date();
-  const hour = today.getHours();
-  const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
-  const firstName = user?.name?.split(' ')[0] || 'Officer';
+  const [stats, setStats] = useState({ total: 0, approvalPending: 0, qualified: 0, converted: 0 });
+
+  useEffect(() => {
+    api.getStats().then(s => setStats(s)).catch(() => {});
+  }, []);
+
+  const today   = new Date();
+  const dateStr = `${DAYS[today.getDay()]}, ${today.getDate()} ${MONTHS[today.getMonth()]}`;
 
   return (
-    <div style={{ height:'100%', overflowY:'auto', background:c.bg, paddingBottom:80 }}>
-      {/* Header */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'20px 16px 8px' }}>
-        <div>
-          <div style={{ fontSize:18, fontWeight:700, color:c.navy }}>{greeting}, {firstName} 👋</div>
-          <div style={{ fontSize:13, color:c.textSecondary }}>Today is {today.toLocaleDateString('en-IN',{day:'numeric',month:'long'})}</div>
-        </div>
-        <div style={{ width:36, height:36, borderRadius:18, background:c.primary, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, color:'#fff', fontWeight:700 }}>
-          {user?.name?.charAt(0) || '👤'}
-        </div>
+    <div style={{ height: '100%', overflowY: 'auto', background: c.surface, paddingBottom: 80 }}>
+
+      {/* Date header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 16px 8px' }}>
+        <CalendarIcon />
+        <span style={{ fontSize: 14, fontWeight: 600, color: c.navy }}>{dateStr}</span>
       </div>
 
-      <CalendarStrip />
+      {/* Two hero cards */}
+      <div style={{ display: 'flex', gap: 12, padding: '8px 16px 20px' }}>
 
-      {/* Dashboard Cards */}
-      <div style={{ display:'flex', gap:10, overflowX:'auto', padding:'0 16px 12px', scrollbarWidth:'none' }}>
-        <DashCard icon="🏦" label="You're beginning Collections!" count={8} sub="Center Meetings" amount={123500} amountSub="Target Amount" btnLabel="Center List" bg="#EBF5FF" onPress={() => {}} />
-        <DashCard icon="📋" label="You have things Sourcing today" count={stats.total} sub="Onboarding Tasks" amount={null} btnLabel="View List" bg="#FEF3C7" onPress={() => navigate('leads')} />
-        <DashCard icon="👥" label="Leads to be met" count={stats.qualified} sub="Qualified Leads" amount={null} amountSub={null} btnLabel="Leads Pool" bg="#D1FAE5" onPress={() => navigate('leads')} />
+        {/* Sourcing card */}
+        <div style={{ flex: 1, background: c.surface, borderRadius: 16, padding: '16px 14px', boxShadow: '0 2px 14px rgba(0,0,0,0.09)', border: `1px solid ${c.borderLight}` }}>
+          <div style={{ width: 44, height: 44, borderRadius: 22, background: '#FA8D29', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+            <PersonIcon />
+          </div>
+          <p style={{ fontSize: 13, color: c.navy, lineHeight: 1.55, margin: '0 0 14px', fontWeight: 400 }}>
+            Well, you have some things <strong>Sourcing</strong> today
+          </p>
+          <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: c.navy }}>{stats.approvalPending || 0}</div>
+              <div style={{ fontSize: 11, color: c.textSecondary }}>Onboarding Tasks</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: c.navy }}>{stats.total || 0}</div>
+              <div style={{ fontSize: 11, color: c.textSecondary }}>Leads Found</div>
+            </div>
+          </div>
+          <button onClick={() => navigate('leads')} style={{ width: '100%', padding: '9px 0', borderRadius: 40, background: '#FA8D29', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            View List →
+          </button>
+        </div>
+
+        {/* Leads card */}
+        <div style={{ flex: 1, background: '#D1FAE5', borderRadius: 16, padding: '16px 14px', boxShadow: '0 2px 14px rgba(0,0,0,0.06)' }}>
+          <div style={{ width: 44, height: 44, borderRadius: 22, background: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+            <ThumbsUpIcon />
+          </div>
+          <p style={{ fontSize: 13, color: c.navy, lineHeight: 1.55, margin: '0 0 14px', fontWeight: 400 }}>
+            And, there are <strong>leads</strong> to be met
+          </p>
+          <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: c.navy }}>{stats.qualified || 0}</div>
+              <div style={{ fontSize: 11, color: c.textSecondary }}>Clients Promised</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: c.navy }}>₹{((stats.converted || 0) * 800).toLocaleString('en-IN')}</div>
+              <div style={{ fontSize: 11, color: c.textSecondary }}>To Be Collected</div>
+            </div>
+          </div>
+          <button onClick={() => navigate('leads')} style={{ width: '100%', padding: '9px 0', borderRadius: 40, background: 'transparent', color: '#059669', border: '1.5px solid #10B981', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            Leads Pool →
+          </button>
+        </div>
+
       </div>
 
       {/* Upcoming Tasks */}
-      <div style={{ padding:'0 16px' }}>
-        <div style={{ fontSize:15, fontWeight:700, color:c.navy, marginBottom:10 }}>Upcoming Tasks</div>
-        {[{title:'Vidyapura Center 1', time:'07:00 AM', type:'Collection'}, {title:'Vidyapura Center 2', time:'09:00 AM', type:'Collection'}].map((t,i) => (
-          <div key={i} style={{ ...card, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-              <span style={{ color:c.pending, fontSize:18 }}>○</span>
-              <div>
-                <div style={{ fontSize:14, fontWeight:600, color:c.navy }}>{t.title}</div>
-                <div style={{ fontSize:12, color:c.textSecondary }}>{t.time} • {t.type}</div>
+      <div style={{ padding: '0 16px' }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: c.navy, marginBottom: 12 }}>Upcoming Tasks</div>
+        <div style={{ display: 'flex', gap: 12, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 8 }}>
+          {MOCK_TASKS.map((task, i) => (
+            <div key={i} style={{ minWidth: 210, flexShrink: 0, background: c.surface, borderRadius: 14, padding: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: `1px solid ${c.borderLight}`, display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 38, height: 38, borderRadius: 19, background: '#FEF6EC', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <LocationIcon />
               </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: c.navy, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.center}</div>
+                <div style={{ fontSize: 11, color: c.textSecondary, marginTop: 2 }}>{task.time} • {task.type}</div>
+              </div>
+              <button style={{ padding: '6px 10px', borderRadius: 8, background: '#EBF5FF', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#1874D0', flexShrink: 0 }}>
+                Map
+              </button>
             </div>
-            <button style={{ display:'flex', alignItems:'center', gap:4, background:'#EBF5FF', border:'none', borderRadius:8, padding:'6px 10px', cursor:'pointer', color:c.primary, fontSize:12, fontWeight:600 }}>🗺 Map</button>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
+
     </div>
   );
 }
