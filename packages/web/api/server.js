@@ -96,8 +96,24 @@ export default async function handler(req, res) {
   // ── GET /api/pincode/:pin ───────────────────────────────────────────────────
   const pinMatch = path.match(/^\/api\/pincode\/(\d+)$/);
   if (m === 'GET' && pinMatch) {
-    const info = PINCODE_DB[pinMatch[1]];
-    return info ? json(res, info) : json(res, { error: 'Pincode not found' }, 404);
+    const pin = pinMatch[1];
+    const local = PINCODE_DB[pin];
+    if (local) return json(res, local);
+    // Fall back to India Post API for any pincode not in local DB
+    try {
+      const r = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
+      const data = await r.json();
+      if (data?.[0]?.Status === 'Success' && data[0].PostOffice?.length) {
+        const po = data[0].PostOffice[0];
+        return json(res, {
+          state:    po.State,
+          district: po.District,
+          taluka:   po.Division || po.District,
+          locality: po.Name,
+        });
+      }
+    } catch (_) { /* fall through to 404 */ }
+    return json(res, { error: 'Pincode not found' }, 404);
   }
 
   // ── GET /api/leads/stats ────────────────────────────────────────────────────

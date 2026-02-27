@@ -40,11 +40,17 @@ export const api = {
       reader.onerror = reject;
       reader.readAsText(file);
     }),
-  downloadTemplate: () => {
+  downloadTemplate: async () => {
+    const res = await fetch(`${BASE}/leads/template`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = `${BASE}/leads/template`;
+    a.href = url;
     a.download = 'lead-upload-template.csv';
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   },
   // Config microservice
   getConfig:      ()        => request('/config'),
