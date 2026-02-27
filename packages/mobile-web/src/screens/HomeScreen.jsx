@@ -45,59 +45,61 @@ export default function HomeScreen({ navigate, user }) {
   const dateStr = `${DAYS[today.getDay()]}, ${today.getDate()} ${MONTHS[today.getMonth()]}`;
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto', background: c.surface, paddingBottom: 80 }}>
+    <div style={{ height: '100%', overflowY: 'auto', background: '#F5F6FA', paddingBottom: 80 }}>
 
       {/* Date header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 16px 8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 16px 10px' }}>
         <CalendarIcon />
         <span style={{ fontSize: 14, fontWeight: 600, color: c.navy }}>{dateStr}</span>
       </div>
 
       {/* Two hero cards */}
-      <div style={{ display: 'flex', gap: 12, padding: '8px 16px 20px' }}>
+      <div style={{ display: 'flex', gap: 12, padding: '8px 16px 24px' }}>
 
-        {/* Sourcing card */}
-        <div style={{ flex: 1, background: c.surface, borderRadius: 16, padding: '16px 14px', boxShadow: '0 2px 14px rgba(0,0,0,0.09)', border: `1px solid ${c.borderLight}` }}>
-          <div style={{ width: 44, height: 44, borderRadius: 22, background: '#FA8D29', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+        {/* Sourcing card — white with shadow to stand out on gray bg */}
+        <div style={{ flex: 1, background: '#fff', borderRadius: 20, padding: '18px 14px 14px', boxShadow: '0 4px 20px rgba(0,0,0,0.10)' }}>
+          <div style={{ width: 52, height: 52, borderRadius: 26, background: '#FA8D29', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
             <PersonIcon />
           </div>
-          <p style={{ fontSize: 13, color: c.navy, lineHeight: 1.55, margin: '0 0 14px', fontWeight: 400 }}>
-            Well, you have some things <strong>Sourcing</strong> today
+          <p style={{ fontSize: 13, color: c.navy, lineHeight: 1.6, margin: '0 0 16px', fontWeight: 400 }}>
+            Well, you have some things{' '}
+            <strong style={{ color: '#FA8D29' }}>Sourcing</strong> today
           </p>
-          <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 14, marginBottom: 16 }}>
             <div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: c.navy }}>{stats.approvalPending || 0}</div>
-              <div style={{ fontSize: 11, color: c.textSecondary }}>Onboarding Tasks</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: c.navy }}>{stats.approvalPending || 0}</div>
+              <div style={{ fontSize: 11, color: c.textSecondary, marginTop: 1 }}>Onboarding Tasks</div>
             </div>
             <div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: c.navy }}>{stats.total || 0}</div>
-              <div style={{ fontSize: 11, color: c.textSecondary }}>Leads Found</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: c.navy }}>{stats.total || 0}</div>
+              <div style={{ fontSize: 11, color: c.textSecondary, marginTop: 1 }}>Leads Found</div>
             </div>
           </div>
-          <button onClick={() => navigate('leads')} style={{ width: '100%', padding: '9px 0', borderRadius: 40, background: '#FA8D29', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={() => navigate('leads')} style={{ width: '100%', padding: '10px 0', borderRadius: 40, background: '#FA8D29', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', letterSpacing: 0.2 }}>
             View List →
           </button>
         </div>
 
-        {/* Leads card */}
-        <div style={{ flex: 1, background: '#D1FAE5', borderRadius: 16, padding: '16px 14px', boxShadow: '0 2px 14px rgba(0,0,0,0.06)' }}>
-          <div style={{ width: 44, height: 44, borderRadius: 22, background: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+        {/* Leads card — green bg */}
+        <div style={{ flex: 1, background: '#DCFCE7', borderRadius: 20, padding: '18px 14px 14px', boxShadow: '0 4px 20px rgba(16,185,129,0.12)' }}>
+          <div style={{ width: 52, height: 52, borderRadius: 26, background: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
             <ThumbsUpIcon />
           </div>
-          <p style={{ fontSize: 13, color: c.navy, lineHeight: 1.55, margin: '0 0 14px', fontWeight: 400 }}>
-            And, there are <strong>leads</strong> to be met
+          <p style={{ fontSize: 13, color: c.navy, lineHeight: 1.6, margin: '0 0 16px', fontWeight: 400 }}>
+            And, there are{' '}
+            <strong style={{ color: '#059669' }}>leads</strong> to be met
           </p>
-          <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 14, marginBottom: 16 }}>
             <div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: c.navy }}>{stats.qualified || 0}</div>
-              <div style={{ fontSize: 11, color: c.textSecondary }}>Clients Promised</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: c.navy }}>{stats.qualified || 0}</div>
+              <div style={{ fontSize: 11, color: c.textSecondary, marginTop: 1 }}>Clients Promised</div>
             </div>
             <div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: c.navy }}>₹{((stats.converted || 0) * 800).toLocaleString('en-IN')}</div>
-              <div style={{ fontSize: 11, color: c.textSecondary }}>To Be Collected</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: c.navy }}>₹{((stats.converted || 0) * 800).toLocaleString('en-IN')}</div>
+              <div style={{ fontSize: 11, color: c.textSecondary, marginTop: 1 }}>To Be Collected</div>
             </div>
           </div>
-          <button onClick={() => navigate('leads')} style={{ width: '100%', padding: '9px 0', borderRadius: 40, background: 'transparent', color: '#059669', border: '1.5px solid #10B981', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={() => navigate('leads')} style={{ width: '100%', padding: '10px 0', borderRadius: 40, background: '#fff', color: '#059669', border: '1.5px solid #10B981', fontSize: 13, fontWeight: 600, cursor: 'pointer', letterSpacing: 0.2 }}>
             Leads Pool →
           </button>
         </div>
@@ -107,17 +109,17 @@ export default function HomeScreen({ navigate, user }) {
       {/* Upcoming Tasks */}
       <div style={{ padding: '0 16px' }}>
         <div style={{ fontSize: 15, fontWeight: 700, color: c.navy, marginBottom: 12 }}>Upcoming Tasks</div>
-        <div style={{ display: 'flex', gap: 12, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 8 }}>
+        <div style={{ display: 'flex', gap: 10, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 8 }}>
           {MOCK_TASKS.map((task, i) => (
-            <div key={i} style={{ minWidth: 210, flexShrink: 0, background: c.surface, borderRadius: 14, padding: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: `1px solid ${c.borderLight}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 38, height: 38, borderRadius: 19, background: '#FEF6EC', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <div key={i} style={{ minWidth: 200, flexShrink: 0, background: '#fff', borderRadius: 14, padding: '12px 14px', boxShadow: '0 2px 10px rgba(0,0,0,0.07)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 20, background: '#FEF6EC', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <LocationIcon />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: c.navy, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.center}</div>
                 <div style={{ fontSize: 11, color: c.textSecondary, marginTop: 2 }}>{task.time} • {task.type}</div>
               </div>
-              <button style={{ padding: '6px 10px', borderRadius: 8, background: '#EBF5FF', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#1874D0', flexShrink: 0 }}>
+              <button style={{ padding: '5px 10px', borderRadius: 8, background: '#EBF5FF', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#1874D0', flexShrink: 0 }}>
                 Map
               </button>
             </div>
