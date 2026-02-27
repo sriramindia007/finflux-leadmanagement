@@ -1,0 +1,14 @@
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  base: './',   // Required for Capacitor — assets use relative paths
+  build: {
+    outDir: 'dist',
+  },
+  server: {
+    port: 5200,
+    proxy: { '/api': 'http://localhost:3001' },
+  },
+});

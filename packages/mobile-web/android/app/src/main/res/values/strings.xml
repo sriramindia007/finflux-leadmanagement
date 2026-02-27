@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Finflux Loanbook</string>
+    <string name="title_activity_main">Finflux Loanbook</string>
+    <string name="package_name">com.finflux.loanbook</string>
+    <string name="custom_url_scheme">com.finflux.loanbook</string>
+</resources>

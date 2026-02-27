@@ -1,0 +1,34 @@
+import React, { useState, useRef } from 'react';
+import { c, input, primaryBtn } from '../theme';
+import { api } from '../services/api';
+
+const sel = { ...input, appearance: 'none', cursor: 'pointer' };
+
+const RULES = {
+  name:       { required: true,  regex: /^[A-Za-zs]{2,}$/, msg: 'Enter a valid name (letters only, min 2 chars)' },
+  mobile:     { required: true,  regex: /^[6-9]d{9}$/,      msg: 'Enter a valid 10-digit Indian mobile number' },
+  leadType:   { required: true,  regex: null,                 msg: 'Select a lead type' },
+  leadSource: { required: true,  regex: null,                 msg: 'Select a lead source' },
+  loanAmount: { required: true,  regex: /^[1-9]d*$/,         msg: 'Enter a valid positive loan amount' },
+  pincode:    { required: false, regex: /^d{6}$/,            msg: 'Enter a valid 6-digit pincode' },
+};
+
+function validateField(field, value) {
+  const rule = RULES[field];
+  if (!rule) return '';
+  if (rule.required && !value) return ;
+  if (value && rule.regex && !rule.regex.test(value)) return rule.msg;
+  return '';
+}
+
+const STATUS_COLORS = {
+  APPROVAL_PENDING: '#F59E0B',
+  QUALIFIED:        '#1874D0',
+  CONVERTED:        '#10B981',
+  REJECTED:         '#EF4444',
+};
+
+const labelStyle   = { fontSize: 12, fontWeight: '600', color: '#374151', marginBottom: 4, display: 'block' };
+const requiredStar = { color: '#EF4444' };
+const errorStyle   = { fontSize: 11, color: '#EF4444', marginTop: 2 };
+const errorBorder  = { borderColor: '#EF4444' };

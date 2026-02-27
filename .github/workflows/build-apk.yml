@@ -1,0 +1,64 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:   # manual trigger from GitHub UI
+  push:
+    branches: [main]
+    paths:
+      - 'packages/mobile-web/**'
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: packages/mobile-web
+        run: npm install
+
+      - name: Build web assets
+        working-directory: packages/mobile-web
+        run: npm run build
+
+      - name: Sync to Android via Capacitor
+        working-directory: packages/mobile-web
+        run: npx cap sync android
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode \
+            > packages/mobile-web/android/app/finflux-loanbook.keystore
+
+      - name: Create keystore.properties
+        run: |
+          cat > packages/mobile-web/android/keystore.properties << 'EOF'
+          storePassword=${{ secrets.KEYSTORE_STORE_PASSWORD }}
+          keyPassword=${{ secrets.KEYSTORE_KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEYSTORE_KEY_ALIAS }}
+          storeFile=finflux-loanbook.keystore
+          EOF
+
+      - name: Build release APK
+        working-directory: packages/mobile-web/android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: finflux-loanbook-release
+          path: packages/mobile-web/android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 30
