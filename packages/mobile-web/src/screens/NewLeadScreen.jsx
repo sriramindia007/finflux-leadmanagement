@@ -11,7 +11,7 @@ const FALLBACK_FIELDS = {
   productType: ['Micro Loan', 'MSME Loan', 'Agri Loan', 'Group Loan'],
 };
 
-const sel = { ...input, appearance: 'none', cursor: 'pointer' };
+const sel = (err) => ({ ...input(err), appearance: 'none', cursor: 'pointer' });
 
 const RULES = {
   name:       { required: true,  regex: /^[A-Za-z\s]{2,}$/, msg: 'Enter a valid name (letters only, min 2 chars)' },
@@ -162,15 +162,8 @@ export default function NewLeadScreen({ navigate, user }) {
   const t = touched;
   const e = errors;
 
-  const inputStyle = (field) => ({
-    ...input,
-    ...(t[field] && e[field] ? errorBorder : {}),
-  });
-
-  const selStyle = (field) => ({
-    ...sel,
-    ...(t[field] && e[field] ? errorBorder : {}),
-  });
+  const inputStyle = (field) => input(t[field] && e[field]);
+  const selStyle   = (field) => sel(t[field] && e[field]);
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#F5F6FA' }}>
@@ -225,7 +218,7 @@ export default function NewLeadScreen({ navigate, user }) {
           {dedup.status === 'found' && proceedingAnyway && (
             <div style={{ marginTop: 6 }}>
               <input
-                style={{ ...input, border: '1px solid #F59E0B', fontSize: 12 }}
+                style={{ ...input(false), border: '1px solid #F59E0B', fontSize: 12 }}
                 value={proceedReason}
                 onChange={ev => setProceedReason(ev.target.value)}
                 placeholder="Reason for proceeding with duplicate..."
@@ -235,7 +228,7 @@ export default function NewLeadScreen({ navigate, user }) {
         </div>
 
         <Field label="Work">
-          <select style={sel} value={form.work} onChange={ev => set('work', ev.target.value)}>
+          <select style={sel(false)} value={form.work} onChange={ev => set('work', ev.target.value)}>
             <option value="">Select</option>
             {opts('work').map(o => <option key={o}>{o}</option>)}
           </select>
@@ -267,14 +260,14 @@ export default function NewLeadScreen({ navigate, user }) {
         </Field>
 
         <Field label="Loan Purpose">
-          <select style={sel} value={form.loanPurpose} onChange={ev => set('loanPurpose', ev.target.value)}>
+          <select style={sel(false)} value={form.loanPurpose} onChange={ev => set('loanPurpose', ev.target.value)}>
             <option value="">Select</option>
             {opts('loanPurpose').map(o => <option key={o}>{o}</option>)}
           </select>
         </Field>
 
         <Field label="Product Type">
-          <select style={sel} value={form.productType} onChange={ev => set('productType', ev.target.value)}>
+          <select style={sel(false)} value={form.productType} onChange={ev => set('productType', ev.target.value)}>
             <option value="">Select</option>
             {opts('productType').map(o => <option key={o}>{o}</option>)}
           </select>
@@ -289,24 +282,24 @@ export default function NewLeadScreen({ navigate, user }) {
         </Field>
 
         <Field label="State">
-          <input style={{ ...input, background: '#F1F3F4', color: c.textMuted }} placeholder="Auto-fill" value={form.state} readOnly />
+          <input style={{ ...input(false), background: '#F1F3F4', color: c.textMuted }} placeholder="Auto-fill" value={form.state} readOnly />
         </Field>
         <Field label="District">
-          <input style={{ ...input, background: '#F1F3F4', color: c.textMuted }} placeholder="Auto-fill" value={form.district} readOnly />
+          <input style={{ ...input(false), background: '#F1F3F4', color: c.textMuted }} placeholder="Auto-fill" value={form.district} readOnly />
         </Field>
         <Field label="Taluka">
-          <input style={{ ...input, background: '#F1F3F4', color: c.textMuted }} placeholder="Auto-fill" value={form.taluka} readOnly />
+          <input style={{ ...input(false), background: '#F1F3F4', color: c.textMuted }} placeholder="Auto-fill" value={form.taluka} readOnly />
         </Field>
 
         <Field label="Locality">
-          <select style={sel} value={form.locality} onChange={ev => set('locality', ev.target.value)}>
+          <select style={sel(false)} value={form.locality} onChange={ev => set('locality', ev.target.value)}>
             <option value="">Select</option>
             {['Banaswadi', 'Jayanagar', 'Vidyanagar', 'Trimulgherry', 'Brodipet'].map(o => <option key={o}>{o}</option>)}
           </select>
         </Field>
 
         <Field label="Notes">
-          <textarea style={{ ...input, minHeight: 72, resize: 'vertical' }} placeholder="Optional notes"
+          <textarea style={{ ...input(false), minHeight: 72, resize: 'vertical' }} placeholder="Optional notes"
             value={form.notes} onChange={ev => set('notes', ev.target.value)} />
         </Field>
 
