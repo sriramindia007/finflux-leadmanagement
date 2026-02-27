@@ -162,6 +162,109 @@ export default async function handler(req, res) {
     return json(res, newLead, 201);
   }
 
+  // ── GET /api/leads/template ─────────────────────────────────────────────────
+  if (m === 'GET' && path === '/api/leads/template') {
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="lead-upload-template.csv"');
+    res.end('name,mobile,work,leadType,leadSource,loanAmount,loanPurpose,pincode,notes\n');
+    return;
+  }
+
+  // ── POST /api/leads/bulk ────────────────────────────────────────────────────
+  if (m === 'POST' && path === '/api/leads/bulk') {
+    // Read raw CSV text body (Content-Type: text/csv, no multipart)
+    const csvText = await new Promise(resolve => {
+      let body = '';
+      req.on('data', c => (body += c));
+      req.on('end', () => resolve(body));
+    });
+
+    const lines = csvText.replace(/\r/g, '').split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2) {
+      return json(res, { error: 'CSV must contain a header row and at least one data row' }, 400);
+    }
+
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const results = { created: 0, duplicates: 0, failed: 0, errors: [] };
+
+    // Fetch all existing leads for dedup check
+    const existingLeads = USE_DB ? await dbGetLeads() : [...getMemLeads()];
+
+    // Build workflow steps (same logic as POST /api/leads)
+    const workflowConfig = USE_DB ? (await sbGetConfig('workflow')) : null;
+    const stepDefs = workflowConfig?.steps || DEFAULT_CONFIGS.workflow.steps;
+    const makeSteps = () =>
+      (stepDefs.length ? stepDefs : DEFAULT_CONFIGS.workflow.steps)
+        .sort((a, b) => a.order - b.order)
+        .map((s, i) => ({
+          id:          randomUUID(),
+          name:        s.label,
+          status:      i === 0 ? 'in_progress' : 'pending',
+          completedAt: null,
+          completedBy: null,
+        }));
+
+    for (let i = 1; i < lines.length; i++) {
+      const rowNum = i + 1;
+      const values = lines[i].split(',');
+      const row = {};
+      headers.forEach((h, idx) => { row[h] = (values[idx] || '').trim(); });
+
+      if (!row.name) {
+        results.failed++;
+        results.errors.push({ row: rowNum, mobile: row.mobile || '', reason: 'Name is required' });
+        continue;
+      }
+      if (!row.mobile) {
+        results.failed++;
+        results.errors.push({ row: rowNum, mobile: '', reason: 'Mobile number is required' });
+        continue;
+      }
+      if (!/^[6-9]\d{9}$/.test(row.mobile)) {
+        results.failed++;
+        results.errors.push({ row: rowNum, mobile: row.mobile, reason: 'Invalid mobile number — must be 10-digit starting with 6-9' });
+        continue;
+      }
+
+      const dup = existingLeads.find(l => l.mobile === row.mobile);
+      if (dup) {
+        results.duplicates++;
+        results.errors.push({ row: rowNum, mobile: row.mobile, reason: `Duplicate — existing Lead ID ${dup.id}` });
+        continue;
+      }
+
+      const newLead = {
+        id:          String(Date.now() + i).padStart(12, '0'),
+        name:        row.name,
+        mobile:      row.mobile,
+        work:        row.work        || '',
+        leadType:    row.leadtype    || 'Individual',
+        leadSource:  row.leadsource  || 'Bulk Upload',
+        loanAmount:  row.loanamount  ? Number(row.loanamount) : 0,
+        loanPurpose: row.loanpurpose || '',
+        pincode:     row.pincode     || '',
+        notes:       row.notes       || '',
+        source:      'Bulk Upload',
+        createdAt:   new Date().toISOString(),
+        createdBy:   'Bulk Upload',
+        status:      'APPROVAL_PENDING',
+        steps:       makeSteps(),
+        callLogs:    [],
+        visitLogs:   [],
+      };
+
+      if (USE_DB) {
+        await dbInsertLead(newLead);
+      } else {
+        getMemLeads().unshift(newLead);
+      }
+      existingLeads.push(newLead); // keep local dedup list current
+      results.created++;
+    }
+
+    return json(res, results);
+  }
+
   // ── Routes with :id ─────────────────────────────────────────────────────────
   const idMatch = path.match(/^\/api\/leads\/([^/]+)(\/.*)?$/);
   if (!idMatch) return json(res, { error: 'Not found' }, 404);

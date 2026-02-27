@@ -1,7 +1,10 @@
 const express = require('express');
 const cors = require('cors');
+const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 const { mockLeads } = require('./mockData');
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // Mock pincode database — covers major Indian cities/towns
 const PINCODE_DB = {
@@ -90,6 +93,89 @@ app.get('/api/leads/stats', (req, res) => {
     converted: leads.filter(l => l.status === 'CONVERTED').length,
     rejected: leads.filter(l => l.status === 'REJECTED').length,
   });
+});
+
+// ── GET /api/leads/template ────────────────────────────────────
+app.get('/api/leads/template', (req, res) => {
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="lead-upload-template.csv"');
+  res.send('name,mobile,work,leadType,leadSource,loanAmount,loanPurpose,pincode,notes\n');
+});
+
+// ── POST /api/leads/bulk ───────────────────────────────────────
+app.post('/api/leads/bulk', upload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+  const content = req.file.buffer.toString('utf8').replace(/\r/g, '');
+  const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length < 2) {
+    return res.status(400).json({ error: 'CSV must contain a header row and at least one data row' });
+  }
+
+  // Parse header — lowercase+trim for loose matching
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+  const results = { created: 0, duplicates: 0, failed: 0, errors: [] };
+
+  for (let i = 1; i < lines.length; i++) {
+    const rowNum = i + 1; // human-readable row number (1=header)
+    const values = lines[i].split(',');
+    const row = {};
+    headers.forEach((h, idx) => { row[h] = (values[idx] || '').trim(); });
+
+    // Validate required fields
+    if (!row.name) {
+      results.failed++;
+      results.errors.push({ row: rowNum, mobile: row.mobile || '', reason: 'Name is required' });
+      continue;
+    }
+    if (!row.mobile) {
+      results.failed++;
+      results.errors.push({ row: rowNum, mobile: '', reason: 'Mobile number is required' });
+      continue;
+    }
+    if (!/^[6-9]\d{9}$/.test(row.mobile)) {
+      results.failed++;
+      results.errors.push({ row: rowNum, mobile: row.mobile, reason: 'Invalid mobile number — must be 10-digit starting with 6-9' });
+      continue;
+    }
+
+    // Dedup check — same mobile in existing leads
+    const existing = leads.find(l => l.mobile === row.mobile);
+    if (existing) {
+      results.duplicates++;
+      results.errors.push({ row: rowNum, mobile: row.mobile, reason: `Duplicate — existing Lead ID ${existing.id}` });
+      continue;
+    }
+
+    // Create lead
+    const newLead = {
+      id: String(Date.now() + i).padStart(12, '0'),
+      name: row.name,
+      mobile: row.mobile,
+      work: row.work || '',
+      leadType: row.leadtype || 'Individual',
+      leadSource: row.leadsource || 'Bulk Upload',
+      loanAmount: row.loanAmount ? Number(row.loanAmount) : 0,
+      loanPurpose: row.loanpurpose || '',
+      pincode: row.pincode || '',
+      notes: row.notes || '',
+      source: 'Bulk Upload',
+      createdAt: new Date().toISOString(),
+      createdBy: 'Bulk Upload',
+      status: 'APPROVAL_PENDING',
+      steps: [
+        { id: uuidv4(), name: 'Basic Details',  status: 'in_progress', completedAt: null, completedBy: null },
+        { id: uuidv4(), name: 'Qualification',  status: 'pending',     completedAt: null, completedBy: null },
+        { id: uuidv4(), name: 'Meet Lead',       status: 'pending',     completedAt: null, completedBy: null },
+      ],
+      callLogs: [],
+      visitLogs: [],
+    };
+    leads.unshift(newLead);
+    results.created++;
+  }
+
+  res.status(200).json(results);
 });
 
 // ── GET /api/leads/:id ─────────────────────────────────────────

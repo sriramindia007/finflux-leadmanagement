@@ -108,8 +108,42 @@ function ConvertModal({ lead, onConfirm, onClose, converting }) {
   );
 }
 
+// ── Reject modal ─────────────────────────────────────────────────
+const REJECT_REASONS = ['Not Interested', 'Ineligible Income', 'Already has Loan', 'Wrong Number', 'Duplicate Lead', 'Other'];
+
+function RejectModal({ onConfirm, onClose, saving }) {
+  const [reason, setReason] = useState('');
+  const [custom, setCustom] = useState('');
+  const finalReason = reason === 'Other' ? custom : reason;
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 300 }} />
+      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', background: '#fff', borderRadius: 10, width: 400, zIndex: 301, boxShadow: '0 8px 32px rgba(0,0,0,0.15)', overflow: 'hidden' }}>
+        <div style={{ padding: '18px 20px', borderBottom: '1px solid #E5E7EB', fontSize: 15, fontWeight: 600, color: '#EF4444' }}>Reject Lead</div>
+        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <p style={{ fontSize: 13, color: '#6B7280', margin: '0 0 8px' }}>Select a rejection reason:</p>
+          {REJECT_REASONS.map(r => (
+            <button key={r} onClick={() => setReason(r)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', borderRadius: 8, border: `2px solid ${reason === r ? '#EF4444' : '#E5E7EB'}`, background: reason === r ? '#FEF2F2' : '#fff', cursor: 'pointer', textAlign: 'left', fontSize: 14, color: reason === r ? '#EF4444' : '#374151', fontWeight: reason === r ? 600 : 400 }}>
+              {r}
+            </button>
+          ))}
+          {reason === 'Other' && (
+            <input autoFocus value={custom} onChange={e => setCustom(e.target.value)} placeholder="Describe the reason..." style={{ marginTop: 4, padding: '8px 12px', border: '1px solid #CFD6DD', borderRadius: 4, fontSize: 14, color: '#003366', outline: 'none' }} />
+          )}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '14px 20px', borderTop: '1px solid #E5E7EB' }}>
+          <button onClick={onClose} style={{ padding: '8px 16px', border: '1px solid #CFD6DD', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: 14 }}>Cancel</button>
+          <button onClick={() => onConfirm(finalReason)} disabled={!finalReason || saving} style={{ padding: '8px 16px', border: 'none', borderRadius: 4, background: !finalReason || saving ? '#9CA3AF' : '#EF4444', color: '#fff', cursor: !finalReason || saving ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 600 }}>
+            {saving ? 'Rejecting...' : 'Confirm Reject'}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── Re-assign modal ──────────────────────────────────────────────
-function ReassignModal({ current, onConfirm, onClose, saving }) {
+function ReassignModal({ current, onConfirm, onClose, saving, error }) {
   const [selected, setSelected] = useState(current || '');
   return (
     <>
@@ -125,6 +159,7 @@ function ReassignModal({ current, onConfirm, onClose, saving }) {
             </button>
           ))}
         </div>
+        {error && <div style={{ margin: '0 20px 8px', padding: '8px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 6, fontSize: 13, color: '#B91C1C' }}>{error}</div>}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '14px 20px', borderTop: '1px solid #E5E7EB' }}>
           <button onClick={onClose} style={{ padding: '8px 16px', border: '1px solid #CFD6DD', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: 14 }}>Cancel</button>
           <button onClick={() => onConfirm(selected)} disabled={!selected || saving} style={{ padding: '8px 16px', border: 'none', borderRadius: 4, background: !selected || saving ? '#9CA3AF' : '#1874D0', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
@@ -174,6 +209,8 @@ export default function LeadDetailPage() {
   const [converting, setConverting]   = useState(false);
   const [showReassign, setShowReassign] = useState(false);
   const [reassigning, setReassigning]   = useState(false);
+  const [reassignError, setReassignError] = useState('');
+  const [showReject, setShowReject]     = useState(false);
   const [prequalify, setPrequalify]     = useState({ status: 'idle', result: null }); // idle|loading|done|error
 
   const load = async () => {
@@ -199,12 +236,16 @@ export default function LeadDetailPage() {
     } finally { setActioning(false); }
   };
 
-  const handleReject = async () => {
-    const reason = window.prompt('Enter rejection reason:');
+  const handleReject = async (reason) => {
     if (!reason) return;
     setActioning(true);
-    await api.updateLead(id, { status: 'REJECTED', rejectionReason: reason });
-    await load(); setActioning(false);
+    try {
+      await api.updateLead(id, { status: 'REJECTED', rejectionReason: reason });
+      await load();
+    } finally {
+      setActioning(false);
+      setShowReject(false);
+    }
   };
 
   const handleActivityComplete = async () => {
@@ -238,10 +279,13 @@ export default function LeadDetailPage() {
 
   const handleReassign = async (foName) => {
     setReassigning(true);
+    setReassignError('');
     try {
       await api.updateLead(id, { assignedTo: foName });
       setShowReassign(false);
       await load();
+    } catch (_) {
+      setReassignError('Failed to reassign. Please try again.');
     } finally { setReassigning(false); }
   };
 
@@ -364,7 +408,7 @@ export default function LeadDetailPage() {
           <div style={s.panelGrid}>
             <InfoPanel title="Basic Details" data={basicData} />
             <div>
-              <InfoPanel title="Field Officer" data={foData} onEdit={() => setShowReassign(true)} />
+              <InfoPanel title="Field Officer" data={foData} onEdit={isTerminal ? undefined : () => setShowReassign(true)} />
               {/* Call Logs */}
               <div style={{ ...s.infoPanel, marginTop: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -407,7 +451,7 @@ export default function LeadDetailPage() {
       {/* Footer Actions */}
       <div style={s.footer}>
         {!isTerminal && (
-          <button onClick={handleReject} disabled={actioning} style={{ ...s.footerBtn, border: '1px solid #EF4444', color: '#EF4444', background: '#fff' }}>Reject</button>
+          <button onClick={() => setShowReject(true)} disabled={actioning} style={{ ...s.footerBtn, border: '1px solid #EF4444', color: '#EF4444', background: '#fff' }}>Reject</button>
         )}
         <button onClick={() => {}} style={{ ...s.footerBtn, border: '1px solid #CFD6DD', background: '#fff', color: '#374151' }}>Start Over</button>
 
@@ -451,7 +495,10 @@ export default function LeadDetailPage() {
         <ConvertModal lead={lead} onConfirm={handleConvert} onClose={() => setShowConvert(false)} converting={converting} />
       )}
       {showReassign && (
-        <ReassignModal current={lead.assignedTo} onConfirm={handleReassign} onClose={() => setShowReassign(false)} saving={reassigning} />
+        <ReassignModal current={lead.assignedTo} onConfirm={handleReassign} onClose={() => { setShowReassign(false); setReassignError(''); }} saving={reassigning} error={reassignError} />
+      )}
+      {showReject && (
+        <RejectModal onConfirm={handleReject} onClose={() => setShowReject(false)} saving={actioning} />
       )}
     </div>
   );

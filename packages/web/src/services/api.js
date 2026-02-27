@@ -23,6 +23,29 @@ export const api = {
   lookupPincode: (pin) => request(`/pincode/${pin}`),
   prequalify: (id) => request(`/leads/${id}/prequalify`, { method: 'POST' }),
   addVisitLog: (id, data) => request(`/leads/${id}/visit-logs`, { method: 'POST', body: JSON.stringify(data) }),
+  bulkUpload: (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const res = await fetch(`${BASE}/leads/bulk`, {
+            method: 'POST',
+            body: e.target.result,
+            headers: { 'Content-Type': 'text/csv' },
+          });
+          if (!res.ok) throw new Error(`API error ${res.status}`);
+          resolve(await res.json());
+        } catch (err) { reject(err); }
+      };
+      reader.onerror = reject;
+      reader.readAsText(file);
+    }),
+  downloadTemplate: () => {
+    const a = document.createElement('a');
+    a.href = `${BASE}/leads/template`;
+    a.download = 'lead-upload-template.csv';
+    a.click();
+  },
   // Config microservice
   getConfig:      ()        => request('/config'),
   getConfigKey:   (key)     => request(`/config/${key}`),

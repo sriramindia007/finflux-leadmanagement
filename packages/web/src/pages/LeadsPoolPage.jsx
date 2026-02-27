@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge';
 import NewLeadDrawer from '../components/NewLeadDrawer';
+import BulkUploadModal from '../components/BulkUploadModal';
 import { api } from '../services/api';
 
 const STATUS_FILTERS = ['ALL', 'APPROVAL_PENDING', 'QUALIFIED', 'REJECTED', 'CONVERTED', 'NOT_CONVERTED'];
@@ -19,6 +20,7 @@ export default function LeadsPoolPage() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
   const [showNewLead, setShowNewLead] = useState(false);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [page, setPage] = useState(1);
   const PER_PAGE = 10;
 
@@ -56,6 +58,7 @@ export default function LeadsPoolPage() {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button style={s.filterBtn}>⊟ Filter</button>
+          <button style={s.bulkBtn} onClick={() => setShowBulkUpload(true)}>⬆ Bulk Upload</button>
           <button style={s.newLeadBtn} onClick={() => setShowNewLead(true)}>+ New Lead</button>
         </div>
       </div>
@@ -104,6 +107,7 @@ export default function LeadsPoolPage() {
       </div>
 
       {showNewLead && <NewLeadDrawer onClose={() => setShowNewLead(false)} onCreated={() => { setShowNewLead(false); load(); }} />}
+      {showBulkUpload && <BulkUploadModal onClose={() => setShowBulkUpload(false)} onUploaded={() => { load(); }} />}
     </div>
   );
 }
@@ -118,6 +122,7 @@ const s = {
   pill: { padding: '5px 14px', borderRadius: 999, border: '1px solid #CFD6DD', background: '#fff', fontSize: 13, color: '#374151', cursor: 'pointer', fontWeight: 400 },
   pillActive: { background: '#003366', color: '#fff', borderColor: '#003366', fontWeight: 600 },
   filterBtn: { padding: '7px 14px', border: '1px solid #CFD6DD', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: 13, color: '#374151' },
+  bulkBtn: { padding: '7px 14px', border: '1px solid #1874D0', borderRadius: 4, background: '#fff', color: '#1874D0', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
   newLeadBtn: { padding: '7px 16px', border: 'none', borderRadius: 4, background: '#1874D0', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
   tableWrap: { background: '#fff', borderRadius: 8, border: '1px solid #E5E7EB', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' },
   table: { width: '100%', borderCollapse: 'collapse' },
