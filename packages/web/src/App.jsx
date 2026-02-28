@@ -5,6 +5,7 @@ import LeadsPoolPage from './pages/LeadsPoolPage';
 import LeadDetailPage from './pages/LeadDetailPage';
 import CallLogsPage from './pages/CallLogsPage';
 import ConfigPage from './pages/ConfigPage';
+import ReportsPage from './pages/ReportsPage';
 
 const DEFAULT_USER = { name: 'Hub Officer', role: 'Hub Team' };
 
@@ -30,7 +31,7 @@ export default function App() {
         <Route path="/todo" element={<Placeholder title="To-Do" />} />
         <Route path="/collections" element={<Placeholder title="Collections" />} />
         <Route path="/customers" element={<Placeholder title="All Customers" />} />
-        <Route path="/reports" element={<Placeholder title="Reports" />} />
+        <Route path="/reports" element={<ReportsPage />} />
       </Routes>
     </div>
   );

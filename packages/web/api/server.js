@@ -3,6 +3,7 @@ import {
   randomUUID, cors, json, parseBody,
   USE_DB, PINCODE_DB, MOCK_LEADS,
   dbGetLeads, dbGetLead, dbInsertLead, dbUpdateLead, dbGetStats,
+  dbGetMonthlyPipeline, dbGetSourceSummary, dbGetOfficerPerformance, dbGetStateSummary,
   sbFetch, sbGetConfig, sbPutConfig,
 } from './_shared.js';
 import { runScoringEngine } from './prequal.js';
@@ -279,6 +280,62 @@ export default async function handler(req, res) {
     }
 
     return json(res, results);
+  }
+
+  // ── GET /api/reports ────────────────────────────────────────────────────────
+  if (m === 'GET' && path === '/api/reports') {
+    if (!USE_DB) {
+      // Compute from mock data so the page is never blank in dev
+      const leads = getMemLeads();
+      const byMonth = {};
+      leads.forEach(l => {
+        const mk = l.createdAt ? l.createdAt.slice(0, 7) : 'Unknown';
+        if (!byMonth[mk]) byMonth[mk] = { month: mk, total_leads: 0, pending: 0, qualified: 0, converted: 0, rejected: 0, converted_amount: 0 };
+        byMonth[mk].total_leads++;
+        if (l.status === 'APPROVAL_PENDING') byMonth[mk].pending++;
+        if (l.status === 'QUALIFIED')        byMonth[mk].qualified++;
+        if (l.status === 'CONVERTED')        { byMonth[mk].converted++; byMonth[mk].converted_amount += Number(l.loanAmount || 0); }
+        if (l.status === 'REJECTED')         byMonth[mk].rejected++;
+      });
+      const bySource = {};
+      leads.forEach(l => {
+        const sk = l.source || 'Unknown';
+        if (!bySource[sk]) bySource[sk] = { source: sk, total: 0, converted: 0, rejected: 0, converted_amount: 0 };
+        bySource[sk].total++;
+        if (l.status === 'CONVERTED') { bySource[sk].converted++; bySource[sk].converted_amount += Number(l.loanAmount || 0); }
+        if (l.status === 'REJECTED')  bySource[sk].rejected++;
+      });
+      Object.values(bySource).forEach(r => { r.conversion_rate_pct = r.total ? +(r.converted * 100 / r.total).toFixed(1) : 0; });
+      const byOfficer = {};
+      leads.forEach(l => {
+        const ok = l.assignedTo || 'Unassigned';
+        if (!byOfficer[ok]) byOfficer[ok] = { officer: ok, total_leads: 0, converted: 0, rejected: 0, pending: 0, converted_amount: 0 };
+        byOfficer[ok].total_leads++;
+        if (l.status === 'CONVERTED')        { byOfficer[ok].converted++; byOfficer[ok].converted_amount += Number(l.loanAmount || 0); }
+        if (l.status === 'REJECTED')         byOfficer[ok].rejected++;
+        if (l.status === 'APPROVAL_PENDING') byOfficer[ok].pending++;
+      });
+      Object.values(byOfficer).forEach(r => { r.conversion_rate_pct = r.total_leads ? +(r.converted * 100 / r.total_leads).toFixed(1) : 0; });
+      return json(res, {
+        monthly:  Object.values(byMonth).sort((a, b) => b.month.localeCompare(a.month)),
+        sources:  Object.values(bySource).sort((a, b) => b.total - a.total),
+        officers: Object.values(byOfficer).sort((a, b) => b.converted - a.converted),
+        summary: {
+          total: leads.length,
+          converted: leads.filter(l => l.status === 'CONVERTED').length,
+          totalDisbursed: leads.filter(l => l.status === 'CONVERTED').reduce((s, l) => s + Number(l.loanAmount || 0), 0),
+        },
+      });
+    }
+    const [monthly, sources, officers] = await Promise.all([
+      dbGetMonthlyPipeline(),
+      dbGetSourceSummary(),
+      dbGetOfficerPerformance(),
+    ]);
+    const stats = await dbGetStats();
+    const allConverted = await sbFetch('/leads?select=loan_amount&status=eq.CONVERTED');
+    const totalDisbursed = (allConverted || []).reduce((s, r) => s + Number(r.loan_amount || 0), 0);
+    return json(res, { monthly, sources, officers, summary: { ...stats, totalDisbursed } });
   }
 
   // ── Routes with :id ─────────────────────────────────────────────────────────

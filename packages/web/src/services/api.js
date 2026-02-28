@@ -52,6 +52,7 @@ export const api = {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   },
+  getReports: () => request('/reports'),
   // Config microservice
   getConfig:      ()        => request('/config'),
   getConfigKey:   (key)     => request(`/config/${key}`),

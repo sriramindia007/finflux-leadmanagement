@@ -62,10 +62,33 @@ export async function dbGetLead(id) {
   return rows?.[0]?.data || null;
 }
 
+// Map lead object → all DB columns (proper columns + full JSON blob)
+function leadToRow(lead) {
+  return {
+    id:               lead.id,
+    status:           lead.status,
+    name:             lead.name,
+    mobile:           lead.mobile,
+    lead_type:        lead.leadType   || null,
+    source:           lead.source     || lead.leadSource || null,
+    loan_amount:      lead.loanAmount ? Number(lead.loanAmount) : null,
+    loan_purpose:     lead.loanPurpose || null,
+    state:            lead.state      || null,
+    district:         lead.district   || null,
+    assigned_to:      lead.assignedTo || null,
+    created_by:       lead.createdBy  || null,
+    created_at:       lead.createdAt  || new Date().toISOString(),
+    converted_at:     lead.convertedAt  || null,
+    rejected_at:      lead.rejectedAt   || null,
+    rejection_reason: lead.rejectionReason || null,
+    data:             lead,
+  };
+}
+
 export async function dbInsertLead(lead) {
   const rows = await sbFetch('/leads', {
     method: 'POST',
-    body: JSON.stringify({ id: lead.id, status: lead.status, name: lead.name, mobile: lead.mobile, data: lead }),
+    body: JSON.stringify(leadToRow(lead)),
   });
   return rows?.[0]?.data || lead;
 }
@@ -74,9 +97,11 @@ export async function dbUpdateLead(id, patch) {
   const current = await dbGetLead(id);
   if (!current) return null;
   const updated = { ...current, ...patch };
+  const row = leadToRow(updated);
+  delete row.id; // don't patch primary key
   const rows = await sbFetch(`/leads?id=eq.${encodeURIComponent(id)}`, {
     method: 'PATCH',
-    body: JSON.stringify({ status: updated.status, name: updated.name, mobile: updated.mobile, data: updated }),
+    body: JSON.stringify(row),
   });
   return rows?.[0]?.data || updated;
 }
@@ -85,12 +110,26 @@ export async function dbGetStats() {
   const rows = await sbFetch('/leads?select=status');
   const all = rows || [];
   return {
-    total: all.length,
+    total:           all.length,
     approvalPending: all.filter(r => r.status === 'APPROVAL_PENDING').length,
-    qualified:  all.filter(r => r.status === 'QUALIFIED').length,
-    converted:  all.filter(r => r.status === 'CONVERTED').length,
-    rejected:   all.filter(r => r.status === 'REJECTED').length,
+    qualified:       all.filter(r => r.status === 'QUALIFIED').length,
+    converted:       all.filter(r => r.status === 'CONVERTED').length,
+    rejected:        all.filter(r => r.status === 'REJECTED').length,
   };
+}
+
+// ── Reporting queries (use DB views) ─────────────────────────────────────
+export async function dbGetMonthlyPipeline() {
+  return sbFetch('/v_monthly_pipeline?select=*&limit=12');
+}
+export async function dbGetSourceSummary() {
+  return sbFetch('/v_source_summary?select=*');
+}
+export async function dbGetOfficerPerformance() {
+  return sbFetch('/v_officer_performance?select=*');
+}
+export async function dbGetStateSummary() {
+  return sbFetch('/v_state_summary?select=*');
 }
 
 // ── HTTP helpers ──────────────────────────────────────────────────────────
