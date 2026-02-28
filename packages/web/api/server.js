@@ -141,16 +141,31 @@ export default async function handler(req, res) {
     });
   }
 
+  // ── GET /api/leads/workload ─────────────────────────────────────────────────
+  if (m === 'GET' && path === '/api/leads/workload') {
+    const leads = USE_DB ? await dbGetLeads(null, null) : getMemLeads();
+    const active = ['APPROVAL_PENDING', 'QUALIFIED'];
+    const workload = {};
+    for (const l of leads) {
+      if (!l.assignedTo || !active.includes(l.status)) continue;
+      workload[l.assignedTo] = (workload[l.assignedTo] || 0) + 1;
+    }
+    return json(res, workload);
+  }
+
   // ── GET /api/leads ──────────────────────────────────────────────────────────
   if (m === 'GET' && path === '/api/leads') {
-    const status = url.searchParams.get('status');
-    const search = url.searchParams.get('search');
+    const status     = url.searchParams.get('status');
+    const search     = url.searchParams.get('search');
+    const assignedTo = url.searchParams.get('assignedTo');
     if (USE_DB) {
       const leads = await dbGetLeads(status, search);
-      return json(res, { data: leads, total: leads.length });
+      const result = assignedTo ? leads.filter(l => l.assignedTo === assignedTo) : leads;
+      return json(res, { data: result, total: result.length });
     }
     let result = [...getMemLeads()];
     if (status && status !== 'ALL') result = result.filter(l => l.status === status);
+    if (assignedTo) result = result.filter(l => l.assignedTo === assignedTo);
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(l => l.name?.toLowerCase().includes(q) || l.id?.includes(q) || l.mobile?.includes(q));
@@ -449,6 +464,52 @@ export default async function handler(req, res) {
       if (l) l.prequalResult = result;
     }
     return json(res, result);
+  }
+
+  // ── POST /api/leads/:id/notes ───────────────────────────────────────────────
+  if (m === 'POST' && rest === '/notes') {
+    const body = await parseBody(req);
+    if (!body.text?.trim()) return json(res, { error: 'Note text is required' }, 400);
+    const note = { id: randomUUID(), text: body.text.trim(), addedBy: body.addedBy || 'Hub Team', addedAt: new Date().toISOString() };
+    if (USE_DB) {
+      const lead = await dbGetLead(id);
+      if (!lead) return json(res, { error: 'Lead not found' }, 404);
+      const notesLog = [...(lead.notesLog || []), note];
+      await dbUpdateLead(id, { notesLog });
+      return json(res, note, 201);
+    }
+    const lead = getMemLeads().find(l => l.id === id);
+    if (!lead) return json(res, { error: 'Lead not found' }, 404);
+    if (!lead.notesLog) lead.notesLog = [];
+    lead.notesLog.push(note);
+    return json(res, note, 201);
+  }
+
+  // ── POST /api/leads/:id/start-over ──────────────────────────────────────────
+  if (m === 'POST' && rest === '/start-over') {
+    const body = await parseBody(req);
+    const workflowConfig = USE_DB ? (await sbGetConfig('workflow')) : null;
+    const stepDefs = workflowConfig?.steps || DEFAULT_CONFIGS.workflow.steps;
+    const freshSteps = (stepDefs.length ? stepDefs : DEFAULT_CONFIGS.workflow.steps)
+      .sort((a, b) => a.order - b.order)
+      .map((s, i) => ({ id: randomUUID(), name: s.label, status: i === 0 ? 'in_progress' : 'pending', completedAt: null, completedBy: null }));
+    const resetNote = { id: randomUUID(), text: `Lead restarted — steps reset to Approval Pending${body.reason ? `. Reason: ${body.reason}` : ''}`, addedBy: body.addedBy || 'Hub Team', addedAt: new Date().toISOString() };
+    if (USE_DB) {
+      const lead = await dbGetLead(id);
+      if (!lead) return json(res, { error: 'Lead not found' }, 404);
+      const notesLog = [...(lead.notesLog || []), resetNote];
+      const updated = await dbUpdateLead(id, { status: 'APPROVAL_PENDING', steps: freshSteps, notesLog, rejectionReason: null });
+      return json(res, updated);
+    }
+    const leads = getMemLeads();
+    const lead  = leads.find(l => l.id === id);
+    if (!lead) return json(res, { error: 'Lead not found' }, 404);
+    lead.status = 'APPROVAL_PENDING';
+    lead.steps  = freshSteps;
+    if (!lead.notesLog) lead.notesLog = [];
+    lead.notesLog.push(resetNote);
+    lead.rejectionReason = null;
+    return json(res, lead);
   }
 
   // ── PATCH /api/leads/:id/steps/:stepId ─────────────────────────────────────

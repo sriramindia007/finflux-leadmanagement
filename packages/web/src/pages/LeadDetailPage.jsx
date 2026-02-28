@@ -6,6 +6,102 @@ import { api } from '../services/api';
 
 const FO_LIST = ['Ravi Kumar', 'Jagan Reddy', 'Sameer Khan', 'Amul Sharma', 'Gopal Nair', 'Mohan Das'];
 
+// ── Start Over modal ─────────────────────────────────────────────
+function StartOverModal({ onConfirm, onClose, saving }) {
+  const [reason, setReason] = useState('');
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 300 }} />
+      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', background: '#fff', borderRadius: 12, width: 440, zIndex: 301, boxShadow: '0 8px 40px rgba(0,0,0,0.18)', overflow: 'hidden' }}>
+        <div style={{ background: 'linear-gradient(135deg,#F59E0B,#D97706)', padding: '20px 24px' }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>Start Over</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 4 }}>This will reset the lead back to Approval Pending and clear all completed steps.</div>
+        </div>
+        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Reason for starting over</label>
+          <textarea
+            autoFocus
+            rows={4}
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            placeholder="Describe why this lead needs to restart the workflow…"
+            style={{ padding: '10px 12px', border: '1px solid #CFD6DD', borderRadius: 8, fontSize: 13, color: '#003366', outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
+          />
+          <div style={{ background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#92400E' }}>
+            All onboarding steps will be reset. Call logs and notes are preserved.
+          </div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '14px 24px', borderTop: '1px solid #E5E7EB' }}>
+          <button onClick={onClose} disabled={saving} style={{ padding: '8px 16px', border: '1px solid #CFD6DD', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: 14 }}>Cancel</button>
+          <button onClick={() => onConfirm(reason)} disabled={!reason.trim() || saving} style={{ padding: '8px 20px', border: 'none', borderRadius: 4, background: !reason.trim() || saving ? '#9CA3AF' : '#F59E0B', color: '#fff', cursor: !reason.trim() || saving ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 600 }}>
+            {saving ? 'Resetting...' : 'Confirm Start Over'}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Activity Timeline ────────────────────────────────────────────
+function ActivityTimeline({ lead }) {
+  const events = [];
+
+  // Lead created
+  if (lead.createdAt) events.push({ ts: lead.createdAt, icon: '🌱', label: 'Lead created', sub: `by ${lead.createdBy || 'Hub Team'}`, color: '#1874D0' });
+
+  // Step completions
+  (lead.steps || []).filter(s => s.status === 'completed' && s.completedAt).forEach(s => {
+    events.push({ ts: s.completedAt, icon: '✓', label: `${s.name} completed`, sub: s.completedBy ? `by ${s.completedBy}` : '', color: '#10B981' });
+  });
+
+  // Call logs — normalize web (customerPickedUp/leadTemp) and mobile (outcome/leadTemperature)
+  (lead.callLogs || []).forEach(log => {
+    const answered = log.customerPickedUp || log.outcome === 'Answered';
+    const temp = log.leadTemp || log.leadTemperature || '';
+    events.push({ ts: log.calledAt, icon: '📞', label: answered ? 'Call — Answered' : `Call — ${log.outcome || 'No answer'}`, sub: `${temp}${log.notes ? (temp ? ' · ' : '') + log.notes.slice(0, 40) : ''}`.trim(), color: '#F59E0B' });
+  });
+
+  // Visit logs
+  (lead.visitLogs || []).forEach(v => {
+    events.push({ ts: v.visitedAt, icon: '📍', label: 'Visit recorded', sub: v.outcome || v.notes || '', color: '#10B981' });
+  });
+
+  // Notes log
+  (lead.notesLog || []).forEach(n => {
+    events.push({ ts: n.addedAt, icon: '📝', label: 'Note added', sub: n.text?.slice(0, 50) || '', color: '#8B5CF6' });
+  });
+
+  // Status changes (inferred from current status)
+  if (lead.status === 'QUALIFIED') events.push({ ts: lead.updatedAt || lead.createdAt, icon: '✅', label: 'Approved — Qualified', sub: '', color: '#10B981' });
+  if (lead.status === 'REJECTED')  events.push({ ts: lead.updatedAt || lead.createdAt, icon: '❌', label: 'Rejected', sub: lead.rejectionReason || '', color: '#EF4444' });
+  if (lead.status === 'CONVERTED') events.push({ ts: lead.convertedAt || lead.updatedAt, icon: '🎉', label: 'Converted to Loan', sub: '', color: '#10B981' });
+
+  events.sort((a, b) => new Date(b.ts) - new Date(a.ts));
+
+  if (events.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: 24, borderTop: '1px solid #E5E7EB', paddingTop: 16 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>Activity</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+        {events.map((e, i) => (
+          <div key={i} style={{ display: 'flex', gap: 10, paddingBottom: 12, position: 'relative' }}>
+            {i < events.length - 1 && <div style={{ position: 'absolute', left: 12, top: 22, bottom: 0, width: 1, background: '#E5E7EB' }} />}
+            <div style={{ width: 24, height: 24, borderRadius: '50%', background: e.color + '22', border: `1.5px solid ${e.color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, flexShrink: 0 }}>{e.icon}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#1F2937', lineHeight: 1.3 }}>{e.label}</div>
+              {e.sub && <div style={{ fontSize: 11, color: '#6B7280', marginTop: 1, lineHeight: 1.3 }}>{e.sub}</div>}
+              <div style={{ fontSize: 10, color: '#9CA3AF', marginTop: 2 }}>
+                {e.ts ? new Date(e.ts).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true }) : '—'}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Step sidebar ────────────────────────────────────────────────
 function StepSidebar({ steps }) {
   return (
@@ -142,22 +238,33 @@ function RejectModal({ onConfirm, onClose, saving }) {
   );
 }
 
-// ── Re-assign modal ──────────────────────────────────────────────
+// ── Re-assign modal (with workload) ──────────────────────────────
 function ReassignModal({ current, onConfirm, onClose, saving, error }) {
   const [selected, setSelected] = useState(current || '');
+  const [workload, setWorkload] = useState({});
+  useEffect(() => { api.getWorkload().then(setWorkload).catch(() => {}); }, []);
   return (
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 300 }} />
-      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', background: '#fff', borderRadius: 10, width: 380, zIndex: 301, boxShadow: '0 8px 32px rgba(0,0,0,0.15)', overflow: 'hidden' }}>
+      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', background: '#fff', borderRadius: 10, width: 400, zIndex: 301, boxShadow: '0 8px 32px rgba(0,0,0,0.15)', overflow: 'hidden' }}>
         <div style={{ padding: '18px 20px', borderBottom: '1px solid #E5E7EB', fontSize: 15, fontWeight: 600, color: '#003366' }}>Re-assign Field Officer</div>
-        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {FO_LIST.map(fo => (
-            <button key={fo} onClick={() => setSelected(fo)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, border: `2px solid ${selected === fo ? '#1874D0' : '#E5E7EB'}`, background: selected === fo ? '#EFF6FF' : '#fff', cursor: 'pointer', textAlign: 'left' }}>
-              <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#1874D0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{fo.charAt(0)}</div>
-              <span style={{ fontSize: 14, color: '#003366', fontWeight: selected === fo ? 600 : 400 }}>{fo}</span>
-              {current === fo && <span style={{ marginLeft: 'auto', fontSize: 11, color: '#9CA3AF' }}>current</span>}
-            </button>
-          ))}
+        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 360, overflowY: 'auto' }}>
+          {FO_LIST.map(fo => {
+            const load = workload[fo] || 0;
+            const overloaded = load >= 15;
+            return (
+              <button key={fo} onClick={() => setSelected(fo)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, border: `2px solid ${selected === fo ? '#1874D0' : '#E5E7EB'}`, background: selected === fo ? '#EFF6FF' : '#fff', cursor: 'pointer', textAlign: 'left' }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: selected === fo ? '#1874D0' : '#E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: selected === fo ? '#fff' : '#6B7280', flexShrink: 0 }}>{fo.charAt(0)}</div>
+                <div style={{ flex: 1, textAlign: 'left' }}>
+                  <div style={{ fontSize: 14, color: '#003366', fontWeight: selected === fo ? 600 : 400 }}>{fo}</div>
+                  <div style={{ fontSize: 11, color: overloaded ? '#DC2626' : '#9CA3AF', marginTop: 1 }}>
+                    {load} active lead{load !== 1 ? 's' : ''}{overloaded ? ' ⚠ High load' : ''}
+                  </div>
+                </div>
+                {current === fo && <span style={{ fontSize: 11, color: '#9CA3AF', flexShrink: 0 }}>current</span>}
+              </button>
+            );
+          })}
         </div>
         {error && <div style={{ margin: '0 20px 8px', padding: '8px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 6, fontSize: 13, color: '#B91C1C' }}>{error}</div>}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '14px 20px', borderTop: '1px solid #E5E7EB' }}>
@@ -212,6 +319,10 @@ export default function LeadDetailPage() {
   const [reassignError, setReassignError] = useState('');
   const [showReject, setShowReject]     = useState(false);
   const [prequalify, setPrequalify]     = useState({ status: 'idle', result: null }); // idle|loading|done|error
+  const [showStartOver, setShowStartOver] = useState(false);
+  const [startingOver, setStartingOver]   = useState(false);
+  const [noteText, setNoteText]           = useState('');
+  const [addingNote, setAddingNote]       = useState(false);
 
   const load = async () => {
     try { const d = await api.getLead(id); setLead(d); } catch (_) {} finally { setLoading(false); }
@@ -265,6 +376,26 @@ export default function LeadDetailPage() {
       setShowConvert(false);
       await load();
     } finally { setConverting(false); }
+  };
+
+  const handleStartOver = async (reason) => {
+    setStartingOver(true);
+    try {
+      await api.startOver(id, { reason, startedBy: 'Hub Team' });
+      setShowStartOver(false);
+      await load();
+    } finally { setStartingOver(false); }
+  };
+
+  const handleAddNote = async () => {
+    const text = noteText.trim();
+    if (!text) return;
+    setAddingNote(true);
+    try {
+      await api.addNote(id, { text, addedBy: 'Hub Team' });
+      setNoteText('');
+      await load();
+    } finally { setAddingNote(false); }
   };
 
   const handlePrequalify = async () => {
@@ -322,7 +453,7 @@ export default function LeadDetailPage() {
     Address: [lead.locality, lead.district, lead.state, lead.pincode].filter(Boolean).join(', '),
     Notes: lead.notes,
   };
-  const foData = { Office: lead.office, Locality: lead.locality, Center: lead.center, 'Field Officer': lead.assignedTo };
+  const foData = { Branch: lead.branch || lead.office, Village: lead.village || lead.locality, Centre: lead.centre || lead.center, 'Field Officer': lead.assignedTo };
   const activeStep = lead.steps?.find(s => s.status === 'in_progress') || lead.steps?.find(s => s.status === 'pending');
 
   return (
@@ -349,9 +480,10 @@ export default function LeadDetailPage() {
       </div>
 
       <div style={s.body}>
-        {/* Left Step Sidebar */}
+        {/* Left Step Sidebar + Activity Timeline */}
         <div style={s.leftPane}>
           <StepSidebar steps={lead.steps} />
+          <ActivityTimeline lead={lead} />
         </div>
 
         {/* Main Content */}
@@ -456,7 +588,9 @@ export default function LeadDetailPage() {
                 {(lead.callLogs || []).slice(-2).reverse().map((log, i) => (
                   <div key={log.id} style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #F3F4F6' }}>
                     <div style={{ fontSize: 12, fontWeight: 600, color: '#003366' }}>Call {lead.callLogs.length - i}</div>
-                    <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>{log.customerPickedUp ? 'Picked up' : 'No answer'} • {log.leadTemp} • {new Date(log.calledAt).toLocaleDateString('en-IN')}</div>
+                    <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
+                      {log.customerPickedUp ? 'Picked up' : log.outcome || 'No answer'} • {log.leadTemp || log.leadTemperature || '—'} • {new Date(log.calledAt).toLocaleDateString('en-IN')}
+                    </div>
                     {log.notes && <div style={{ fontSize: 12, color: '#374151', marginTop: 4 }}>{log.notes}</div>}
                   </div>
                 ))}
@@ -478,6 +612,70 @@ export default function LeadDetailPage() {
                 {prequalify.status === 'error'   && <p style={{ fontSize: 13, color: '#EF4444', margin: 0 }}>Failed. Try again.</p>}
                 {prequalify.status === 'done' && prequalify.result && <PrequalifyPanel result={prequalify.result} />}
               </div>
+
+              {/* Visit Logs */}
+              <div style={{ ...s.infoPanel, marginTop: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div style={{ borderLeft: '3px solid #10B981', paddingLeft: 8, fontSize: 14, fontWeight: 600, color: '#10B981' }}>Visit Logs</div>
+                </div>
+                {(lead.visitLogs || []).length === 0 ? (
+                  <p style={{ fontSize: 13, color: '#9CA3AF', margin: 0 }}>No visits recorded yet — field officer logs visits from the mobile app</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {[...(lead.visitLogs || [])].reverse().map((v, i) => (
+                      <div key={v.id || i} style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8, padding: '9px 12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#065F46' }}>📍 {v.location || 'Customer Location'}</div>
+                          <div style={{ fontSize: 11, color: '#6B7280' }}>{v.visitedAt ? new Date(v.visitedAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true }) : '—'}</div>
+                        </div>
+                        {v.outcome && <div style={{ fontSize: 12, color: '#374151', marginTop: 4 }}>Outcome: {v.outcome}</div>}
+                        {v.notes && <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>{v.notes}</div>}
+                        <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 4 }}>By: {v.visitedBy || lead.assignedTo || 'Field Officer'}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Notes Log */}
+              <div style={{ ...s.infoPanel, marginTop: 16 }}>
+                <div style={{ borderLeft: '3px solid #8B5CF6', paddingLeft: 8, fontSize: 14, fontWeight: 600, color: '#8B5CF6', marginBottom: 12 }}>Notes Log</div>
+
+                {/* Add note form */}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  <input
+                    type="text"
+                    value={noteText}
+                    onChange={e => setNoteText(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleAddNote()}
+                    placeholder="Add a note…"
+                    style={{ flex: 1, padding: '7px 10px', border: '1px solid #CFD6DD', borderRadius: 6, fontSize: 13, color: '#003366', outline: 'none' }}
+                  />
+                  <button
+                    onClick={handleAddNote}
+                    disabled={!noteText.trim() || addingNote}
+                    style={{ padding: '7px 14px', border: 'none', borderRadius: 6, background: !noteText.trim() || addingNote ? '#E5E7EB' : '#8B5CF6', color: !noteText.trim() || addingNote ? '#9CA3AF' : '#fff', cursor: !noteText.trim() || addingNote ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600 }}
+                  >
+                    {addingNote ? '…' : 'Add'}
+                  </button>
+                </div>
+
+                {/* Notes list */}
+                {(lead.notesLog || []).length === 0 ? (
+                  <p style={{ fontSize: 13, color: '#9CA3AF', margin: 0 }}>No notes yet</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {[...(lead.notesLog || [])].reverse().map(n => (
+                      <div key={n.id} style={{ background: '#F9FAFB', border: '1px solid #F3F4F6', borderRadius: 8, padding: '9px 12px' }}>
+                        <div style={{ fontSize: 13, color: '#1F2937', lineHeight: 1.5 }}>{n.text}</div>
+                        <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 4 }}>
+                          {n.addedBy} · {new Date(n.addedAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -488,7 +686,9 @@ export default function LeadDetailPage() {
         {!isTerminal && (
           <button onClick={() => setShowReject(true)} disabled={actioning} style={{ ...s.footerBtn, border: '1px solid #EF4444', color: '#EF4444', background: '#fff' }}>Reject</button>
         )}
-        <button onClick={() => {}} style={{ ...s.footerBtn, border: '1px solid #CFD6DD', background: '#fff', color: '#374151' }}>Start Over</button>
+        {!isTerminal && (
+          <button onClick={() => setShowStartOver(true)} disabled={actioning} style={{ ...s.footerBtn, border: '1px solid #F59E0B', background: '#fff', color: '#D97706' }}>↺ Start Over</button>
+        )}
 
         {lead.status === 'APPROVAL_PENDING' && (
           <button
@@ -534,6 +734,9 @@ export default function LeadDetailPage() {
       )}
       {showReject && (
         <RejectModal onConfirm={handleReject} onClose={() => setShowReject(false)} saving={actioning} />
+      )}
+      {showStartOver && (
+        <StartOverModal onConfirm={handleStartOver} onClose={() => setShowStartOver(false)} saving={startingOver} />
       )}
     </div>
   );

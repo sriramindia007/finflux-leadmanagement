@@ -5,11 +5,7 @@ import { api } from '../services/api';
 const DAYS   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-// Build task list using officer's centre — replace with API when available
-const makeTasks = (centre) => [
-  { center: centre || 'My Centre', time: '07:00 AM', type: 'Collection' },
-  { center: centre || 'My Centre', time: '09:00 AM', type: 'Sourcing' },
-];
+const ACTIVE_STATUSES = ['APPROVAL_PENDING', 'QUALIFIED'];
 
 const CalendarIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1874D0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -34,12 +30,43 @@ const LocationIcon = () => (
   </svg>
 );
 
+// Status display labels for task strip
+const STATUS_LABEL = {
+  APPROVAL_PENDING: 'Pending Approval',
+  QUALIFIED: 'Needs Follow-up',
+};
+
 export default function HomeScreen({ navigate, user }) {
   const [stats, setStats] = useState({ total: 0, approvalPending: 0, qualified: 0, converted: 0 });
+  const [tasks, setTasks] = useState([]);
 
   useEffect(() => {
-    api.getStats().then(s => setStats(s)).catch(() => {});
-  }, []);
+    if (!user?.name) return;
+
+    // Load officer-scoped leads for stats + task strip
+    api.getLeads({ assignedTo: user.name })
+      .then(({ data }) => {
+        setStats({
+          total:           data.length,
+          approvalPending: data.filter(l => l.status === 'APPROVAL_PENDING').length,
+          qualified:       data.filter(l => l.status === 'QUALIFIED').length,
+          converted:       data.filter(l => l.status === 'CONVERTED').length,
+        });
+        // Task strip: active leads that need action
+        const active = data.filter(l => ACTIVE_STATUSES.includes(l.status));
+        setTasks(
+          active.slice(0, 5).map(l => ({
+            id:     l.id,
+            name:   l.name,
+            center: l.centre || l.branch || 'Field Visit',
+            label:  STATUS_LABEL[l.status] || l.status,
+            type:   l.leadType || 'Lead',
+            lead:   l,
+          }))
+        );
+      })
+      .catch(() => {});
+  }, [user?.name]);
 
   const today   = new Date();
   const dateStr = `${DAYS[today.getDay()]}, ${today.getDate()} ${MONTHS[today.getMonth()]}`;
@@ -60,7 +87,8 @@ export default function HomeScreen({ navigate, user }) {
           </div>
         )}
       </div>
-      {/* Assignment pill */}
+
+      {/* Assignment pills */}
       {(user?.branch || user?.centre) && (
         <div style={{ display: 'flex', gap: 8, padding: '6px 16px 8px', flexWrap: 'wrap' }}>
           {user.branch  && <span style={{ fontSize: 11, background: '#EBF5FF', color: '#1874D0', borderRadius: 99, padding: '3px 10px', fontWeight: 600 }}>{user.branch}</span>}
@@ -72,75 +100,92 @@ export default function HomeScreen({ navigate, user }) {
       {/* Two hero cards */}
       <div style={{ display: 'flex', gap: 12, padding: '8px 16px 24px' }}>
 
-        {/* Sourcing card — white with shadow to stand out on gray bg */}
+        {/* Sourcing card */}
         <div style={{ flex: 1, background: '#fff', borderRadius: 20, padding: '18px 14px 14px', boxShadow: '0 4px 20px rgba(0,0,0,0.10)' }}>
           <div style={{ width: 52, height: 52, borderRadius: 26, background: '#FA8D29', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
             <PersonIcon />
           </div>
           <p style={{ fontSize: 13, color: c.navy, lineHeight: 1.6, margin: '0 0 16px', fontWeight: 400 }}>
-            Well, you have some things{' '}
-            <strong style={{ color: '#FA8D29' }}>Sourcing</strong> today
+            You have{' '}
+            <strong style={{ color: '#FA8D29' }}>sourcing</strong> to do today
           </p>
           <div style={{ display: 'flex', gap: 14, marginBottom: 16 }}>
             <div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: c.navy }}>{stats.approvalPending || 0}</div>
-              <div style={{ fontSize: 11, color: c.textSecondary, marginTop: 1 }}>Onboarding Tasks</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: c.navy }}>{stats.approvalPending}</div>
+              <div style={{ fontSize: 11, color: c.textMuted, marginTop: 1 }}>Pending Approval</div>
             </div>
             <div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: c.navy }}>{stats.total || 0}</div>
-              <div style={{ fontSize: 11, color: c.textSecondary, marginTop: 1 }}>Leads Found</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: c.navy }}>{stats.total}</div>
+              <div style={{ fontSize: 11, color: c.textMuted, marginTop: 1 }}>My Leads</div>
             </div>
           </div>
-          <button onClick={() => navigate('leads')} style={{ width: '100%', padding: '10px 0', borderRadius: 40, background: '#FA8D29', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', letterSpacing: 0.2 }}>
+          <button
+            onClick={() => navigate('leads')}
+            style={{ width: '100%', padding: '10px 0', borderRadius: 40, background: '#FA8D29', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+          >
             View List →
           </button>
         </div>
 
-        {/* Leads card — green bg */}
+        {/* Qualified leads card */}
         <div style={{ flex: 1, background: '#DCFCE7', borderRadius: 20, padding: '18px 14px 14px', boxShadow: '0 4px 20px rgba(16,185,129,0.12)' }}>
           <div style={{ width: 52, height: 52, borderRadius: 26, background: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
             <ThumbsUpIcon />
           </div>
           <p style={{ fontSize: 13, color: c.navy, lineHeight: 1.6, margin: '0 0 16px', fontWeight: 400 }}>
-            And, there are{' '}
-            <strong style={{ color: '#059669' }}>leads</strong> to be met
+            And,{' '}
+            <strong style={{ color: '#059669' }}>leads</strong> to follow up
           </p>
           <div style={{ display: 'flex', gap: 14, marginBottom: 16 }}>
             <div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: c.navy }}>{stats.qualified || 0}</div>
-              <div style={{ fontSize: 11, color: c.textSecondary, marginTop: 1 }}>Clients Promised</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: c.navy }}>{stats.qualified}</div>
+              <div style={{ fontSize: 11, color: c.textMuted, marginTop: 1 }}>Qualified</div>
             </div>
             <div>
               <div style={{ fontSize: 22, fontWeight: 700, color: c.navy }}>₹{((stats.converted || 0) * 800).toLocaleString('en-IN')}</div>
-              <div style={{ fontSize: 11, color: c.textSecondary, marginTop: 1 }}>To Be Collected</div>
+              <div style={{ fontSize: 11, color: c.textMuted, marginTop: 1 }}>Earned</div>
             </div>
           </div>
-          <button onClick={() => navigate('leads')} style={{ width: '100%', padding: '10px 0', borderRadius: 40, background: '#fff', color: '#059669', border: '1.5px solid #10B981', fontSize: 13, fontWeight: 600, cursor: 'pointer', letterSpacing: 0.2 }}>
+          <button
+            onClick={() => navigate('leads')}
+            style={{ width: '100%', padding: '10px 0', borderRadius: 40, background: '#fff', color: '#059669', border: '1.5px solid #10B981', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+          >
             Leads Pool →
           </button>
         </div>
 
       </div>
 
-      {/* Upcoming Tasks */}
+      {/* Upcoming Tasks — real leads requiring action */}
       <div style={{ padding: '0 16px' }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: c.navy, marginBottom: 12 }}>Upcoming Tasks</div>
-        <div style={{ display: 'flex', gap: 10, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 8 }}>
-          {makeTasks(user?.centre).map((task, i) => (
-            <div key={i} style={{ minWidth: 200, flexShrink: 0, background: '#fff', borderRadius: 14, padding: '12px 14px', boxShadow: '0 2px 10px rgba(0,0,0,0.07)', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 20, background: '#FEF6EC', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <LocationIcon />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: c.navy, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.center}</div>
-                <div style={{ fontSize: 11, color: c.textSecondary, marginTop: 2 }}>{task.time} • {task.type}</div>
-              </div>
-              <button style={{ padding: '5px 10px', borderRadius: 8, background: '#EBF5FF', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: '#1874D0', flexShrink: 0 }}>
-                Map
-              </button>
-            </div>
-          ))}
+        <div style={{ fontSize: 15, fontWeight: 700, color: c.navy, marginBottom: 12 }}>
+          Action Required {tasks.length > 0 && <span style={{ fontSize: 12, fontWeight: 400, color: c.textMuted }}>({tasks.length})</span>}
         </div>
+        {tasks.length === 0 ? (
+          <div style={{ background: '#fff', borderRadius: 14, padding: '16px 14px', boxShadow: '0 2px 10px rgba(0,0,0,0.07)', color: c.textMuted, fontSize: 13, textAlign: 'center' }}>
+            All caught up 🎉
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 10, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 8 }}>
+            {tasks.map((task) => (
+              <div
+                key={task.id}
+                onClick={() => navigate('journey', task.lead)}
+                style={{ minWidth: 210, flexShrink: 0, background: '#fff', borderRadius: 14, padding: '12px 14px', boxShadow: '0 2px 10px rgba(0,0,0,0.07)', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
+              >
+                <div style={{ width: 40, height: 40, borderRadius: 20, background: '#FEF6EC', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <LocationIcon />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: c.navy, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.name}</div>
+                  <div style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>{task.center} • {task.type}</div>
+                  <div style={{ fontSize: 10, color: '#FA8D29', fontWeight: 600, marginTop: 2 }}>{task.label}</div>
+                </div>
+                <span style={{ color: c.textMuted, fontSize: 16 }}>›</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
     </div>

@@ -53,6 +53,9 @@ export const api = {
     URL.revokeObjectURL(url);
   },
   getReports: () => request('/reports'),
+  getWorkload: () => request('/leads/workload'),
+  addNote: (id, data) => request(`/leads/${id}/notes`, { method: 'POST', body: JSON.stringify(data) }),
+  startOver: (id, data) => request(`/leads/${id}/start-over`, { method: 'POST', body: JSON.stringify(data) }),
   // Config microservice
   getConfig:      ()        => request('/config'),
   getConfigKey:   (key)     => request(`/config/${key}`),
