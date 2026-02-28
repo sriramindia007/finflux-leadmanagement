@@ -2,12 +2,24 @@ import React, { useState } from 'react';
 import { api } from '../services/api';
 
 export default function AddCallLogDrawer({ leadId, onClose, onSaved }) {
-  const [form, setForm] = useState({ date: new Date().toISOString().split('T')[0], time: '10:00', ampm: 'AM', customerPickedUp: null, leadTemp: null, notes: '', followUpDate: '', followUpTime: '' });
+  const today = new Date().toISOString().split('T')[0];
+  const [form, setForm] = useState({ date: today, time: '10:00', ampm: 'AM', customerPickedUp: null, leadTemp: null, notes: '', followUpDate: '', followUpTime: '' });
   const [saving, setSaving] = useState(false);
+  const [followUpError, setFollowUpError] = useState('');
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
+  const handleFollowUpDate = (v) => {
+    set('followUpDate', v);
+    if (v && v < today) setFollowUpError('Follow-up date cannot be in the past');
+    else setFollowUpError('');
+  };
+
   const handleSave = async () => {
+    if (form.followUpDate && form.followUpDate < today) {
+      setFollowUpError('Follow-up date cannot be in the past');
+      return;
+    }
     setSaving(true);
     try {
       await api.addCallLog(leadId, {
@@ -82,7 +94,8 @@ export default function AddCallLogDrawer({ leadId, onClose, onSaved }) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 10 }}>
                 <div>
                   <label style={{ fontSize: 12, color: '#6B7280', display: 'block', marginBottom: 4 }}>Follow-up Date</label>
-                  <input type="date" style={{ ...inputStyle, width: '100%' }} value={form.followUpDate} onChange={e => set('followUpDate', e.target.value)} />
+                  <input type="date" min={today} style={{ ...inputStyle, width: '100%', borderColor: followUpError ? '#EF4444' : '#CFD6DD' }} value={form.followUpDate} onChange={e => handleFollowUpDate(e.target.value)} />
+                  {followUpError && <span style={{ fontSize: 11, color: '#EF4444', marginTop: 2, display: 'block' }}>{followUpError}</span>}
                 </div>
                 <div>
                   <label style={{ fontSize: 12, color: '#6B7280', display: 'block', marginBottom: 4 }}>Follow-up Time</label>

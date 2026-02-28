@@ -6,6 +6,17 @@ const LEAD_TYPES = ['Individual', 'Group'];
 const SOURCES = ['Field Scouting', 'Inbound Call', 'Outbound Call', 'Back Office', 'Referral', 'DSA', 'Digital Campaign', 'Walk-in', 'WhatsApp'];
 const PURPOSES = ['Business', 'Working Capital', 'Business Expansion', 'Asset Purchase', 'Education'];
 
+// Hub-level master data: branches → villages → centres + officers
+const HUB_OFFICERS = [
+  { name: 'Ravi Kumar',   branch: 'Bengaluru South', village: 'Jayanagar',  centre: 'Jayanagar C2'  },
+  { name: 'Amul Sharma',  branch: 'Bengaluru South', village: 'Jayanagar',  centre: 'Jayanagar C2'  },
+  { name: 'Gopal Nair',   branch: 'Bengaluru North', village: 'Banaswadi',  centre: 'Banaswadi C1'  },
+  { name: 'Jagan Reddy',  branch: 'Guntur',          village: 'Brodipet',   centre: 'Brodipet C1'   },
+  { name: 'Mohan Das',    branch: 'Guntur',          village: 'Brodipet',   centre: 'Brodipet C1'   },
+  { name: 'Sameer Khan',  branch: 'Dharwad',         village: 'Vidyanagar', centre: 'Vidyanagar C1' },
+];
+const HUB_BRANCHES = [...new Set(HUB_OFFICERS.map(o => o.branch))].sort();
+
 const RULES = {
   name:       { required: true,  regex: /^[A-Za-z\s]{2,}$/,  msg: 'Enter a valid name (letters only, min 2 chars)' },
   mobile:     { required: true,  regex: /^[6-9]\d{9}$/,       msg: 'Enter a valid 10-digit Indian mobile number' },
@@ -41,6 +52,28 @@ const inputStyle = (err) => ({ ...baseInput, border: `1px solid ${err ? '#EF4444
 const disabledStyle = { ...baseInput, border: '1px solid #CFD6DD', background: '#F1F3F4', color: '#9CA3AF' };
 
 export default function NewLeadDrawer({ user, onClose, onCreated }) {
+  const isHubTeam = user?.role === 'Hub Team';
+
+  // Hub assignment state (only used when isHubTeam)
+  const [hubBranch,  setHubBranch]  = useState('');
+  const [hubVillage, setHubVillage] = useState('');
+  const [hubCentre,  setHubCentre]  = useState('');
+  const [hubOfficer, setHubOfficer] = useState('');
+
+  const branchOfficers  = HUB_OFFICERS.filter(o => o.branch === hubBranch);
+  const branchVillages  = [...new Set(branchOfficers.map(o => o.village))];
+  const villageCentres  = [...new Set(branchOfficers.filter(o => o.village === hubVillage).map(o => o.centre))];
+  const centreOfficers  = branchOfficers.filter(o => o.centre === hubCentre);
+
+  const handleHubBranch = (b) => { setHubBranch(b); setHubVillage(''); setHubCentre(''); setHubOfficer(''); };
+  const handleHubVillage = (v) => { setHubVillage(v); setHubCentre(''); setHubOfficer(''); };
+  const handleHubCentre  = (c) => { setHubCentre(c); setHubOfficer(''); };
+  const handleHubOfficer = (name) => {
+    setHubOfficer(name);
+    const fo = HUB_OFFICERS.find(o => o.name === name);
+    if (fo) { setHubBranch(fo.branch); setHubVillage(fo.village); setHubCentre(fo.centre); }
+  };
+
   const [form, setForm] = useState({
     name: '', mobile: '', work: '', leadType: '', leadSource: '',
     loanAmount: '', loanPurpose: '', pincode: '', state: '', district: '',
@@ -110,8 +143,10 @@ export default function NewLeadDrawer({ user, onClose, onCreated }) {
       const payload = {
         ...form,
         loanAmount: Number(form.loanAmount),
-        branch: user?.branch || '',
-        centre: user?.centre || '',
+        branch:     isHubTeam ? hubBranch  : (user?.branch  || ''),
+        village:    isHubTeam ? hubVillage : (user?.village || ''),
+        centre:     isHubTeam ? hubCentre  : (user?.centre  || ''),
+        assignedTo: isHubTeam ? hubOfficer : '',
         createdBy: user?.name || 'Hub Team',
       };
       if (proceedingAnyway && proceedReason) payload.dedupOverrideReason = proceedReason;
@@ -138,13 +173,47 @@ export default function NewLeadDrawer({ user, onClose, onCreated }) {
 
         {/* Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Officer assignment info */}
-          {user?.branch && (
+          {/* Hub Team: editable assignment; Field Officer: read-only */}
+          {isHubTeam ? (
+            <div style={{ background: '#F8FAFF', border: '1px solid #DBEAFE', borderRadius: 8, padding: '12px 14px' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#1874D0', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10 }}>Assign to Branch / Officer</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={{ fontSize: 12, color: '#6B7280', fontWeight: 500, display: 'block', marginBottom: 4 }}>Branch</label>
+                  <select style={{ ...inputStyle(false), padding: '7px 10px', fontSize: 13 }} value={hubBranch} onChange={e => handleHubBranch(e.target.value)}>
+                    <option value="">Select branch</option>
+                    {HUB_BRANCHES.map(b => <option key={b}>{b}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: '#6B7280', fontWeight: 500, display: 'block', marginBottom: 4 }}>Village</label>
+                  <select style={{ ...inputStyle(false), padding: '7px 10px', fontSize: 13 }} value={hubVillage} onChange={e => handleHubVillage(e.target.value)} disabled={!hubBranch}>
+                    <option value="">Select village</option>
+                    {branchVillages.map(v => <option key={v}>{v}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: '#6B7280', fontWeight: 500, display: 'block', marginBottom: 4 }}>Centre</label>
+                  <select style={{ ...inputStyle(false), padding: '7px 10px', fontSize: 13 }} value={hubCentre} onChange={e => handleHubCentre(e.target.value)} disabled={!hubVillage}>
+                    <option value="">Select centre</option>
+                    {villageCentres.map(c => <option key={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: '#6B7280', fontWeight: 500, display: 'block', marginBottom: 4 }}>Assign Field Officer</label>
+                  <select style={{ ...inputStyle(false), padding: '7px 10px', fontSize: 13 }} value={hubOfficer} onChange={e => handleHubOfficer(e.target.value)}>
+                    <option value="">Select officer</option>
+                    {(hubCentre ? centreOfficers : hubBranch ? branchOfficers : HUB_OFFICERS).map(o => <option key={o.name}>{o.name}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+          ) : user?.branch ? (
             <div style={{ background: '#EBF5FF', borderRadius: 8, padding: '10px 14px', display: 'flex', gap: 20 }}>
               <div><div style={{ fontSize: 10, fontWeight: 700, color: '#1874D0', letterSpacing: 0.5, textTransform: 'uppercase' }}>Branch</div><div style={{ fontSize: 13, fontWeight: 600, color: '#003366', marginTop: 2 }}>{user.branch}</div></div>
               {user.centre && <div><div style={{ fontSize: 10, fontWeight: 700, color: '#1874D0', letterSpacing: 0.5, textTransform: 'uppercase' }}>Centre</div><div style={{ fontSize: 13, fontWeight: 600, color: '#003366', marginTop: 2 }}>{user.centre}</div></div>}
             </div>
-          )}
+          ) : null}
           <div style={{ borderLeft: '3px solid #1874D0', paddingLeft: 12 }}>
             <span style={{ fontSize: 14, fontWeight: 600, color: '#1874D0' }}>Basic Details</span>
           </div>
