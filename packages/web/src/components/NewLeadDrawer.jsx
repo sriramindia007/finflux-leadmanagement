@@ -40,12 +40,12 @@ const baseInput = { padding: '8px 12px', borderRadius: 6, fontSize: 14, color: '
 const inputStyle = (err) => ({ ...baseInput, border: `1px solid ${err ? '#EF4444' : '#CFD6DD'}` });
 const disabledStyle = { ...baseInput, border: '1px solid #CFD6DD', background: '#F1F3F4', color: '#9CA3AF' };
 
-export default function NewLeadDrawer({ onClose, onCreated }) {
+export default function NewLeadDrawer({ user, onClose, onCreated }) {
   const [form, setForm] = useState({
     name: '', mobile: '', work: '', leadType: '', leadSource: '',
     loanAmount: '', loanPurpose: '', pincode: '', state: '', district: '',
     taluka: '', locality: '', notes: '',
-    createdBy: 'Hub Team', createdByRole: 'Back Office', source: 'Back Office',
+    createdBy: user?.name || 'Hub Team', createdByRole: 'Back Office', source: 'Back Office',
   });
   const [errors, setErrors]         = useState({});
   const [touched, setTouched]       = useState({});
@@ -107,7 +107,13 @@ export default function NewLeadDrawer({ onClose, onCreated }) {
 
     setSaving(true); setSubmitError('');
     try {
-      const payload = { ...form, loanAmount: Number(form.loanAmount) };
+      const payload = {
+        ...form,
+        loanAmount: Number(form.loanAmount),
+        branch: user?.branch || '',
+        centre: user?.centre || '',
+        createdBy: user?.name || 'Hub Team',
+      };
       if (proceedingAnyway && proceedReason) payload.dedupOverrideReason = proceedReason;
       const lead = await api.createLead(payload);
       onCreated(lead);
@@ -132,6 +138,13 @@ export default function NewLeadDrawer({ onClose, onCreated }) {
 
         {/* Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Officer assignment info */}
+          {user?.branch && (
+            <div style={{ background: '#EBF5FF', borderRadius: 8, padding: '10px 14px', display: 'flex', gap: 20 }}>
+              <div><div style={{ fontSize: 10, fontWeight: 700, color: '#1874D0', letterSpacing: 0.5, textTransform: 'uppercase' }}>Branch</div><div style={{ fontSize: 13, fontWeight: 600, color: '#003366', marginTop: 2 }}>{user.branch}</div></div>
+              {user.centre && <div><div style={{ fontSize: 10, fontWeight: 700, color: '#1874D0', letterSpacing: 0.5, textTransform: 'uppercase' }}>Centre</div><div style={{ fontSize: 13, fontWeight: 600, color: '#003366', marginTop: 2 }}>{user.centre}</div></div>}
+            </div>
+          )}
           <div style={{ borderLeft: '3px solid #1874D0', paddingLeft: 12 }}>
             <span style={{ fontSize: 14, fontWeight: 600, color: '#1874D0' }}>Basic Details</span>
           </div>

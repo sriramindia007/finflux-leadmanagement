@@ -3,7 +3,7 @@ import {
   randomUUID, cors, json, parseBody,
   USE_DB, PINCODE_DB, MOCK_LEADS,
   dbGetLeads, dbGetLead, dbInsertLead, dbUpdateLead, dbGetStats,
-  dbGetMonthlyPipeline, dbGetSourceSummary, dbGetOfficerPerformance, dbGetStateSummary,
+  dbGetMonthlyPipeline, dbGetSourceSummary, dbGetOfficerPerformance, dbGetStateSummary, dbGetBranchSummary,
   sbFetch, sbGetConfig, sbPutConfig,
 } from './_shared.js';
 import { runScoringEngine } from './prequal.js';
@@ -25,7 +25,18 @@ async function ensureSeeded() {
     for (const l of MOCK_LEADS) {
       await sbFetch('/leads', {
         method: 'POST',
-        body: JSON.stringify({ id: l.id, status: l.status, name: l.name, mobile: l.mobile, data: l }),
+        body: JSON.stringify({
+          id: l.id, status: l.status, name: l.name, mobile: l.mobile,
+          source: l.source || l.leadSource || null,
+          lead_type: l.leadType || null,
+          loan_amount: l.loanAmount ? Number(l.loanAmount) : null,
+          loan_purpose: l.loanPurpose || null,
+          state: l.state || null, district: l.district || null,
+          assigned_to: l.assignedTo || null, created_by: l.createdBy || null,
+          created_at: l.createdAt || new Date().toISOString(),
+          branch: l.office || null, village: l.locality || null, centre: l.center || null,
+          data: l,
+        }),
       });
     }
   }
@@ -183,7 +194,7 @@ export default async function handler(req, res) {
   if (m === 'GET' && path === '/api/leads/template') {
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="lead-upload-template.csv"');
-    res.end('name,mobile,work,leadType,leadSource,loanAmount,loanPurpose,pincode,notes\n');
+    res.end('name,mobile,work,leadType,leadSource,loanAmount,loanPurpose,pincode,branch,village,centre,notes\n');
     return;
   }
 
@@ -260,6 +271,9 @@ export default async function handler(req, res) {
         loanAmount:  row.loanamount  ? Number(row.loanamount) : 0,
         loanPurpose: row.loanpurpose || '',
         pincode:     row.pincode     || '',
+        branch:      row.branch      || '',
+        village:     row.village     || '',
+        centre:      row.centre      || '',
         notes:       row.notes       || '',
         source:      'Bulk Upload',
         createdAt:   new Date().toISOString(),
@@ -309,33 +323,48 @@ export default async function handler(req, res) {
       const byOfficer = {};
       leads.forEach(l => {
         const ok = l.assignedTo || 'Unassigned';
-        if (!byOfficer[ok]) byOfficer[ok] = { officer: ok, total_leads: 0, converted: 0, rejected: 0, pending: 0, converted_amount: 0 };
+        if (!byOfficer[ok]) byOfficer[ok] = { officer: ok, branch: l.branch || l.office || '', total_leads: 0, converted: 0, rejected: 0, pending: 0, converted_amount: 0 };
         byOfficer[ok].total_leads++;
         if (l.status === 'CONVERTED')        { byOfficer[ok].converted++; byOfficer[ok].converted_amount += Number(l.loanAmount || 0); }
         if (l.status === 'REJECTED')         byOfficer[ok].rejected++;
         if (l.status === 'APPROVAL_PENDING') byOfficer[ok].pending++;
       });
       Object.values(byOfficer).forEach(r => { r.conversion_rate_pct = r.total_leads ? +(r.converted * 100 / r.total_leads).toFixed(1) : 0; });
+      const byBranch = {};
+      leads.forEach(l => {
+        const bk = l.branch || l.office || 'Unknown';
+        if (!byBranch[bk]) byBranch[bk] = { branch: bk, total_leads: 0, pending: 0, converted: 0, rejected: 0, converted_amount: 0 };
+        byBranch[bk].total_leads++;
+        if (l.status === 'APPROVAL_PENDING') byBranch[bk].pending++;
+        if (l.status === 'CONVERTED') { byBranch[bk].converted++; byBranch[bk].converted_amount += Number(l.loanAmount || 0); }
+        if (l.status === 'REJECTED')  byBranch[bk].rejected++;
+      });
+      Object.values(byBranch).forEach(r => { r.conversion_rate_pct = r.total_leads ? +(r.converted * 100 / r.total_leads).toFixed(1) : 0; });
       return json(res, {
         monthly:  Object.values(byMonth).sort((a, b) => b.month.localeCompare(a.month)),
         sources:  Object.values(bySource).sort((a, b) => b.total - a.total),
         officers: Object.values(byOfficer).sort((a, b) => b.converted - a.converted),
+        branches: Object.values(byBranch).sort((a, b) => b.total_leads - a.total_leads),
         summary: {
           total: leads.length,
+          approvalPending: leads.filter(l => l.status === 'APPROVAL_PENDING').length,
+          qualified:       leads.filter(l => l.status === 'QUALIFIED').length,
           converted: leads.filter(l => l.status === 'CONVERTED').length,
+          rejected:  leads.filter(l => l.status === 'REJECTED').length,
           totalDisbursed: leads.filter(l => l.status === 'CONVERTED').reduce((s, l) => s + Number(l.loanAmount || 0), 0),
         },
       });
     }
-    const [monthly, sources, officers] = await Promise.all([
+    const [monthly, sources, officers, branches] = await Promise.all([
       dbGetMonthlyPipeline(),
       dbGetSourceSummary(),
       dbGetOfficerPerformance(),
+      dbGetBranchSummary(),
     ]);
     const stats = await dbGetStats();
     const allConverted = await sbFetch('/leads?select=loan_amount&status=eq.CONVERTED');
     const totalDisbursed = (allConverted || []).reduce((s, r) => s + Number(r.loan_amount || 0), 0);
-    return json(res, { monthly, sources, officers, summary: { ...stats, totalDisbursed } });
+    return json(res, { monthly, sources, officers, branches, summary: { ...stats, totalDisbursed } });
   }
 
   // ── Routes with :id ─────────────────────────────────────────────────────────

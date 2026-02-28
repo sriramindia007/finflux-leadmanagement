@@ -14,7 +14,7 @@ function fmt(iso) {
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) + '\n' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
-export default function LeadsPoolPage() {
+export default function LeadsPoolPage({ user }) {
   const navigate = useNavigate();
   const [leads, setLeads] = useState([]);
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -73,16 +73,16 @@ export default function LeadsPoolPage() {
         <table style={s.table}>
           <thead>
             <tr>
-              {['Created on','Created by','Source','Lead ID','Customer Name','State','Assignee','Status'].map(h => (
+              {['Created on','Created by','Source','Lead ID','Customer Name','Branch','State','Assignee','Status'].map(h => (
                 <th key={h} style={s.th}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8} style={{ textAlign: 'center', padding: 48, color: '#9CA3AF' }}>Loading...</td></tr>
+              <tr><td colSpan={9} style={{ textAlign: 'center', padding: 48, color: '#9CA3AF' }}>Loading...</td></tr>
             ) : paged.length === 0 ? (
-              <tr><td colSpan={8} style={{ textAlign: 'center', padding: 48, color: '#9CA3AF' }}>No leads found</td></tr>
+              <tr><td colSpan={9} style={{ textAlign: 'center', padding: 48, color: '#9CA3AF' }}>No leads found</td></tr>
             ) : paged.map(lead => (
               <tr
                 key={lead.id}
@@ -97,6 +97,14 @@ export default function LeadsPoolPage() {
                 <td style={s.td}>{lead.source || '—'}</td>
                 <td style={s.td}><span style={{ fontFamily: 'monospace', fontSize: 11, color: '#9CA3AF' }}>{lead.id}</span></td>
                 <td style={{ ...s.td, fontWeight: 600, color: '#003366' }}>{lead.name}</td>
+                <td style={s.td}>
+                  {lead.branch || lead.office ? (
+                    <div>
+                      <div style={{ fontWeight: 500, color: '#374151', fontSize: 12 }}>{lead.branch || lead.office}</div>
+                      {lead.centre || lead.center ? <div style={{ fontSize: 11, color: '#9CA3AF' }}>{lead.centre || lead.center}</div> : null}
+                    </div>
+                  ) : <span style={{ color: '#CFD6DD' }}>—</span>}
+                </td>
                 <td style={s.td}>{lead.state || '—'}</td>
                 <td style={s.td}>{lead.assignedTo || <span style={{ color: '#CFD6DD' }}>Unassigned</span>}</td>
                 <td style={s.td}><StatusBadge status={lead.status} small /></td>
@@ -120,7 +128,7 @@ export default function LeadsPoolPage() {
         </div>
       </div>
 
-      {showNewLead && <NewLeadDrawer onClose={() => setShowNewLead(false)} onCreated={() => { setShowNewLead(false); load(); }} />}
+      {showNewLead && <NewLeadDrawer user={user} onClose={() => setShowNewLead(false)} onCreated={() => { setShowNewLead(false); load(); }} />}
       {showBulkUpload && <BulkUploadModal onClose={() => setShowBulkUpload(false)} onUploaded={() => { load(); }} />}
     </div>
   );

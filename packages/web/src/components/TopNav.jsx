@@ -11,6 +11,7 @@ const NAV_ITEMS = [
 ];
 
 const ROLES = ['Hub Team', 'Branch Manager'];
+const HUB_BRANCHES = ['HQ', 'Bengaluru North', 'Bengaluru South', 'Dharwad', 'Guntur', 'Hyderabad Central'];
 
 export default function TopNav({ user, onUserChange }) {
   const { pathname } = useLocation();
@@ -88,6 +89,23 @@ export default function TopNav({ user, onUserChange }) {
                     </div>
                   )}
                 </div>
+                {/* Branch info */}
+                {user?.branch && (
+                  <div style={{ padding: '6px 16px', borderBottom: '1px solid #F3F4F6' }}>
+                    <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 4, fontWeight: 600 }}>BRANCH</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {HUB_BRANCHES.map(b => (
+                        <button
+                          key={b}
+                          onClick={() => onUserChange({ ...user, branch: b })}
+                          style={{ padding: '3px 8px', borderRadius: 99, border: `1px solid ${user?.branch === b ? '#1874D0' : '#E5E7EB'}`, background: user?.branch === b ? '#EBF5FF' : '#F9FAFB', color: user?.branch === b ? '#1874D0' : '#6B7280', fontSize: 11, fontWeight: user?.branch === b ? 700 : 400, cursor: 'pointer' }}
+                        >
+                          {b}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {/* Role switcher */}
                 <div style={{ padding: '8px 16px' }}>
                   <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 6, fontWeight: 500 }}>ROLE</div>

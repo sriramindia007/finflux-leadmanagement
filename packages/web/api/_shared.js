@@ -81,6 +81,9 @@ function leadToRow(lead) {
     converted_at:     lead.convertedAt  || null,
     rejected_at:      lead.rejectedAt   || null,
     rejection_reason: lead.rejectionReason || null,
+    branch:           lead.branch     || lead.office || null,
+    village:          lead.village    || null,
+    centre:           lead.centre     || lead.center || null,
     data:             lead,
   };
 }
@@ -130,6 +133,9 @@ export async function dbGetOfficerPerformance() {
 }
 export async function dbGetStateSummary() {
   return sbFetch('/v_state_summary?select=*');
+}
+export async function dbGetBranchSummary() {
+  return sbFetch('/v_branch_summary?select=*');
 }
 
 // ── HTTP helpers ──────────────────────────────────────────────────────────

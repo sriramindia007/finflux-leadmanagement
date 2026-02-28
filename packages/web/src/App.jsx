@@ -7,7 +7,7 @@ import CallLogsPage from './pages/CallLogsPage';
 import ConfigPage from './pages/ConfigPage';
 import ReportsPage from './pages/ReportsPage';
 
-const DEFAULT_USER = { name: 'Hub Officer', role: 'Hub Team' };
+const DEFAULT_USER = { name: 'Hub Officer', role: 'Hub Team', branch: 'HQ', centre: '' };
 
 export default function App() {
   const [user, setUser] = useState(() => {
@@ -24,7 +24,7 @@ export default function App() {
       <TopNav user={user} onUserChange={handleUserChange} />
       <Routes>
         <Route path="/" element={<Navigate to="/leads" replace />} />
-        <Route path="/leads" element={<LeadsPoolPage />} />
+        <Route path="/leads" element={<LeadsPoolPage user={user} />} />
         <Route path="/leads/:id" element={<LeadDetailPage user={user} />} />
         <Route path="/leads/:id/call-logs" element={<CallLogsPage />} />
         <Route path="/config" element={<ConfigPage />} />

@@ -147,6 +147,9 @@ export default function NewLeadScreen({ navigate, user }) {
       const payload = {
         ...form, loanAmount: Number(form.loanAmount),
         source: form.leadSource, createdBy: user?.name || 'Field Officer', createdByRole: 'Field Officer',
+        branch:  user?.branch  || '',
+        village: user?.village || '',
+        centre:  user?.centre  || '',
       };
       if (proceedingAnyway && proceedReason) payload.dedupOverrideReason = proceedReason;
       await api.createLead(payload);
@@ -175,6 +178,15 @@ export default function NewLeadScreen({ navigate, user }) {
 
       {/* Form */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px' }}>
+
+        {/* Officer assignment — auto-populated, read-only */}
+        {(user?.branch || user?.village || user?.centre) && (
+          <div style={{ background: '#EBF5FF', borderRadius: 10, padding: '10px 14px', marginBottom: 14, marginTop: 4, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            {user.branch  && <div><div style={{ fontSize: 10, fontWeight: 700, color: '#1874D0', letterSpacing: 0.5, textTransform: 'uppercase' }}>Branch</div><div style={{ fontSize: 13, fontWeight: 600, color: '#003366', marginTop: 2 }}>{user.branch}</div></div>}
+            {user.village && <div><div style={{ fontSize: 10, fontWeight: 700, color: '#1874D0', letterSpacing: 0.5, textTransform: 'uppercase' }}>Village</div><div style={{ fontSize: 13, fontWeight: 600, color: '#003366', marginTop: 2 }}>{user.village}</div></div>}
+            {user.centre  && <div><div style={{ fontSize: 10, fontWeight: 700, color: '#1874D0', letterSpacing: 0.5, textTransform: 'uppercase' }}>Centre</div><div style={{ fontSize: 13, fontWeight: 600, color: '#003366', marginTop: 2 }}>{user.centre}</div></div>}
+          </div>
+        )}
 
         {/* Basic Info */}
         <div style={{ fontSize: 13, fontWeight: 700, color: c.navy, margin: '4px 0 10px' }}>Basic Info</div>

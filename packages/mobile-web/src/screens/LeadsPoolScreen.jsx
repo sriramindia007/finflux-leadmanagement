@@ -51,9 +51,14 @@ export default function LeadsPoolScreen({ navigate }) {
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
                   <div style={{ flex:1 }}>
                     <div style={{ fontSize:15, fontWeight:700, color:c.navy }}>{lead.name}</div>
-                    <div style={{ fontSize:12, color:c.textSecondary, margin:'3px 0 6px' }}>
-                      {lead.leadType} Lead{lead.source ? ` · ${lead.source}` : ''}{lead.locality ? ` · ${lead.locality}` : ''}
+                    <div style={{ fontSize:12, color:c.textSecondary, margin:'3px 0 2px' }}>
+                      {lead.leadType} Lead{lead.source ? ` · ${lead.source}` : ''}
                     </div>
+                    {(lead.branch || lead.centre) && (
+                      <div style={{ fontSize:11, color:c.textMuted, marginBottom:5 }}>
+                        {[lead.branch, lead.village, lead.centre].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
                     <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                       <StatusBadge status={lead.status} />
                       {lead.status === 'CONVERTED' && <span style={{ color:c.converted, fontWeight:700, fontSize:13 }}>+₹800</span>}

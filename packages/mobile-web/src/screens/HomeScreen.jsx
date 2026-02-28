@@ -5,10 +5,10 @@ import { api } from '../services/api';
 const DAYS   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-// Mock upcoming tasks — replace with API call when available
-const MOCK_TASKS = [
-  { center: 'Vidyapura Center 1', time: '07:00 AM', type: 'Collection' },
-  { center: 'Vidyapura Center 1', time: '09:00 AM', type: 'Collection' },
+// Build task list using officer's centre — replace with API when available
+const makeTasks = (centre) => [
+  { center: centre || 'My Centre', time: '07:00 AM', type: 'Collection' },
+  { center: centre || 'My Centre', time: '09:00 AM', type: 'Sourcing' },
 ];
 
 const CalendarIcon = () => (
@@ -48,10 +48,26 @@ export default function HomeScreen({ navigate, user }) {
     <div style={{ height: '100%', overflowY: 'auto', background: '#F5F6FA', paddingBottom: 80 }}>
 
       {/* Date header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 16px 10px' }}>
-        <CalendarIcon />
-        <span style={{ fontSize: 14, fontWeight: 600, color: c.navy }}>{dateStr}</span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 16px 4px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <CalendarIcon />
+          <span style={{ fontSize: 14, fontWeight: 600, color: c.navy }}>{dateStr}</span>
+        </div>
+        {user?.name && (
+          <div style={{ fontSize: 12, color: '#6B7280', textAlign: 'right' }}>
+            <div style={{ fontWeight: 600, color: c.navy }}>{user.name}</div>
+            {user.branch && <div style={{ fontSize: 11, color: c.textMuted }}>{user.branch}</div>}
+          </div>
+        )}
       </div>
+      {/* Assignment pill */}
+      {(user?.branch || user?.centre) && (
+        <div style={{ display: 'flex', gap: 8, padding: '6px 16px 8px', flexWrap: 'wrap' }}>
+          {user.branch  && <span style={{ fontSize: 11, background: '#EBF5FF', color: '#1874D0', borderRadius: 99, padding: '3px 10px', fontWeight: 600 }}>{user.branch}</span>}
+          {user.village && <span style={{ fontSize: 11, background: '#F0FDF4', color: '#059669', borderRadius: 99, padding: '3px 10px', fontWeight: 600 }}>{user.village}</span>}
+          {user.centre  && <span style={{ fontSize: 11, background: '#FEF6EC', color: '#FA8D29', borderRadius: 99, padding: '3px 10px', fontWeight: 600 }}>{user.centre}</span>}
+        </div>
+      )}
 
       {/* Two hero cards */}
       <div style={{ display: 'flex', gap: 12, padding: '8px 16px 24px' }}>
@@ -110,7 +126,7 @@ export default function HomeScreen({ navigate, user }) {
       <div style={{ padding: '0 16px' }}>
         <div style={{ fontSize: 15, fontWeight: 700, color: c.navy, marginBottom: 12 }}>Upcoming Tasks</div>
         <div style={{ display: 'flex', gap: 10, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 8 }}>
-          {MOCK_TASKS.map((task, i) => (
+          {makeTasks(user?.centre).map((task, i) => (
             <div key={i} style={{ minWidth: 200, flexShrink: 0, background: '#fff', borderRadius: 14, padding: '12px 14px', boxShadow: '0 2px 10px rgba(0,0,0,0.07)', display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ width: 40, height: 40, borderRadius: 20, background: '#FEF6EC', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <LocationIcon />

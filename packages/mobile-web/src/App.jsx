@@ -6,8 +6,15 @@ import OnboardingJourneyScreen from './screens/OnboardingJourneyScreen';
 import RejectionScreen from './screens/RejectionScreen';
 import SchedulerScreen from './screens/SchedulerScreen';
 
-const OFFICERS = ['Ravi Kumar', 'Jagan', 'Sameer', 'Amul', 'Gopal', 'Mohan'];
-const DEFAULT_USER = { name: 'Ravi Kumar', role: 'FIELD_OFFICER' };
+const OFFICERS = [
+  { name: 'Ravi Kumar', branch: 'Bengaluru South', village: 'Jayanagar',  centre: 'Jayanagar C2'   },
+  { name: 'Jagan',      branch: 'Guntur',          village: 'Brodipet',   centre: 'Brodipet C1'    },
+  { name: 'Sameer',     branch: 'Dharwad',         village: 'Vidyanagar', centre: 'Vidyanagar C1'  },
+  { name: 'Amul',       branch: 'Bengaluru South', village: 'Jayanagar',  centre: 'Jayanagar C2'   },
+  { name: 'Gopal',      branch: 'Bengaluru North', village: 'Banaswadi',  centre: 'Banaswadi C1'   },
+  { name: 'Mohan',      branch: 'Guntur',          village: 'Brodipet',   centre: 'Brodipet C1'    },
+];
+const DEFAULT_USER = { name: 'Ravi Kumar', role: 'FIELD_OFFICER', branch: 'Bengaluru South', village: 'Jayanagar', centre: 'Jayanagar C2' };
 
 const HomeIcon = ({ active }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? '#2196F3' : 'none'} stroke={active ? '#2196F3' : '#9CA3AF'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -44,8 +51,8 @@ export default function App() {
   const [screen, setScreen] = useState('home');
   const [params, setParams] = useState(null);
 
-  const switchOfficer = (name) => {
-    const u = { name, role: 'FIELD_OFFICER' };
+  const switchOfficer = (officer) => {
+    const u = { name: officer.name, role: 'FIELD_OFFICER', branch: officer.branch, village: officer.village, centre: officer.centre };
     localStorage.setItem('flo_user', JSON.stringify(u));
     setUser(u);
   };
@@ -55,11 +62,11 @@ export default function App() {
   const showBottomNav = ['home','search','metrics','profile'].includes(screen);
 
   const renderProfile = () => (
-    <div style={{ height:'100%', display:'flex', flexDirection:'column', background:'#F5F6FA', padding: 24 }}>
+    <div style={{ height:'100%', overflowY:'auto', background:'#F5F6FA', padding: 24 }}>
       <div style={{ fontSize:18, fontWeight:700, color:'#003366', marginBottom:20 }}>Profile</div>
       {/* Current user */}
       <div style={{ background:'#fff', borderRadius:16, padding:20, boxShadow:'0 2px 8px rgba(0,0,0,0.08)', marginBottom:20 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:16 }}>
           <div style={{ width:52, height:52, borderRadius:26, background:'#2196F3', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, color:'#fff', fontWeight:700 }}>
             {user.name.charAt(0)}
           </div>
@@ -68,19 +75,38 @@ export default function App() {
             <div style={{ fontSize:12, color:'#2196F3', fontWeight:600, marginTop:2, letterSpacing:0.5 }}>FIELD OFFICER</div>
           </div>
         </div>
+        {/* Assignment details */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+          {[
+            { label:'Branch',  value: user.branch  || '—' },
+            { label:'Village', value: user.village || '—' },
+            { label:'Centre',  value: user.centre  || '—' },
+          ].map(({ label, value }) => (
+            <div key={label} style={{ background:'#F5F6FA', borderRadius:10, padding:'10px 12px' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#9CA3AF', letterSpacing:0.5, textTransform:'uppercase', marginBottom:3 }}>{label}</div>
+              <div style={{ fontSize:13, fontWeight:600, color:'#003366' }}>{value}</div>
+            </div>
+          ))}
+        </div>
       </div>
       {/* Switch officer */}
       <div style={{ fontSize:13, fontWeight:600, color:'#6B7280', marginBottom:10 }}>SWITCH OFFICER</div>
       <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-        {OFFICERS.map(name => (
-          <button
-            key={name}
-            onClick={() => switchOfficer(name)}
-            style={{ padding:'12px 16px', borderRadius:12, border:`2px solid ${user.name === name ? '#2196F3' : '#E8EDF2'}`, background: user.name === name ? '#EBF5FF' : '#fff', color: user.name === name ? '#2196F3' : '#374151', fontSize:14, fontWeight: user.name === name ? 700 : 400, cursor:'pointer', textAlign:'left' }}
-          >
-            {name} {user.name === name ? '✓' : ''}
-          </button>
-        ))}
+        {OFFICERS.map(officer => {
+          const active = user.name === officer.name;
+          return (
+            <button
+              key={officer.name}
+              onClick={() => switchOfficer(officer)}
+              style={{ padding:'12px 16px', borderRadius:12, border:`2px solid ${active ? '#2196F3' : '#E8EDF2'}`, background: active ? '#EBF5FF' : '#fff', cursor:'pointer', textAlign:'left' }}
+            >
+              <div style={{ fontSize:14, fontWeight: active ? 700 : 500, color: active ? '#2196F3' : '#374151' }}>
+                {officer.name} {active ? '✓' : ''}
+              </div>
+              <div style={{ fontSize:12, color:'#9CA3AF', marginTop:2 }}>{officer.branch} · {officer.centre}</div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
