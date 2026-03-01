@@ -30,8 +30,11 @@ function StepRow({ step, onComplete, userRole }) {
   const active  = step.status === 'in_progress';
   const pending = step.status === 'pending';
 
-  const isFieldOfficerStep = step.name === 'Meet Lead';
-  const canTap = active && (userRole !== 'FIELD_OFFICER' || isFieldOfficerStep);
+  // Use stepDefId for reliable identification; fall back to name-based slug for old leads
+  const stepDefId   = step.stepDefId || step.name?.toLowerCase().replace(/\s+/g, '_');
+  const isHubStep   = step.role === 'Hub Team' || stepDefId === 'basic_details' || stepDefId === 'qualification';
+  // FO can complete any non-hub active step
+  const canTap      = active && (userRole !== 'FIELD_OFFICER' || !isHubStep);
 
   return (
     <div
@@ -48,11 +51,11 @@ function StepRow({ step, onComplete, userRole }) {
             {step.completedAt ? new Date(step.completedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : ''} • by {step.completedBy || 'Hub Team'}
           </div>
         )}
-        {active && !isFieldOfficerStep && (
-          <div style={{ fontSize: 11, color: '#FA8D29', marginTop: 2 }}>Hub team completing this step</div>
+        {active && isHubStep && (
+          <div style={{ fontSize: 11, color: '#FA8D29', marginTop: 2 }}>This step is completed by the Hub Team</div>
         )}
-        {active && isFieldOfficerStep && (
-          <div style={{ fontSize: 11, color: c.primary, marginTop: 2 }}>Tap to mark as complete</div>
+        {active && !isHubStep && canTap && (
+          <div style={{ fontSize: 11, color: c.primary, marginTop: 2 }}>Tap to record outcome</div>
         )}
       </div>
       {canTap && <span style={{ color: c.primary, fontSize: 16 }}>›</span>}
@@ -291,6 +294,112 @@ function VisitLogSheet({ lead, user, onClose, onSaved }) {
   );
 }
 
+// ── Meet Lead step sheet ───────────────────────────────────────────
+const MEET_OUTCOMES = ['Met', 'Not Met', 'Rescheduled'];
+
+function MeetLeadSheet({ lead, step, user, onClose, onCompleted }) {
+  const [outcome, setOutcome] = useState('');
+  const [notes,   setNotes]   = useState('');
+  const [saving,  setSaving]  = useState(false);
+
+  const canSave = outcome.trim() && notes.trim();
+
+  const save = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    try {
+      await api.addVisitLog(lead.id, {
+        outcome,
+        notes:     notes.trim(),
+        visitedBy: user?.name || 'Field Officer',
+        visitedAt: new Date().toISOString(),
+      });
+      await api.updateStep(lead.id, step.id, {
+        status:      'completed',
+        completedAt: new Date().toISOString(),
+        completedBy: user?.name || 'Field Officer',
+      });
+      onCompleted();
+      onClose();
+    } catch (_) {
+      alert('Failed to complete step. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const outcomeColors = { 'Met': '#059669', 'Not Met': '#DC2626', 'Rescheduled': '#D97706' };
+  const outcomeIcons  = { 'Met': '✅', 'Not Met': '❌', 'Rescheduled': '🔄' };
+
+  return (
+    <Sheet onClose={onClose}>
+      <div style={{ fontSize: 16, fontWeight: 700, color: c.navy, marginBottom: 4 }}>🤝 Meet Lead — Record Outcome</div>
+      <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 16 }}>Record what happened during your meeting with the lead.</div>
+
+      <label style={{ fontSize: 12, fontWeight: 600, color: c.textSecondary, display: 'block', marginBottom: 8 }}>Meeting Outcome *</label>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        {MEET_OUTCOMES.map(o => {
+          const isActive = outcome === o;
+          return (
+            <button
+              key={o}
+              onClick={() => setOutcome(o)}
+              style={{ flex: 1, padding: '10px 0', borderRadius: 40, border: `1.5px solid ${isActive ? outcomeColors[o] : c.border}`, background: isActive ? outcomeColors[o] : '#fff', color: isActive ? '#fff' : c.textSecondary, fontSize: 13, fontWeight: isActive ? 700 : 400, cursor: 'pointer' }}
+            >
+              {outcomeIcons[o]} {o}
+            </button>
+          );
+        })}
+      </div>
+
+      <label style={{ fontSize: 12, fontWeight: 600, color: c.textSecondary, display: 'block', marginBottom: 6 }}>Notes *</label>
+      <textarea
+        value={notes}
+        onChange={e => setNotes(e.target.value)}
+        placeholder="Describe what was discussed during the meeting…"
+        rows={4}
+        style={{ width: '100%', padding: '12px', border: `1.5px solid ${notes.trim() ? c.border : c.border}`, borderRadius: 12, fontSize: 14, color: c.navy, resize: 'none', outline: 'none', boxSizing: 'border-box', fontFamily: 'Inter, sans-serif', marginBottom: 20 }}
+      />
+
+      <button
+        onClick={save}
+        disabled={!canSave || saving}
+        style={{ width: '100%', padding: '14px', borderRadius: 40, background: !canSave || saving ? '#CFD6DD' : c.primary, border: 'none', color: '#fff', fontSize: 15, fontWeight: 700, cursor: !canSave || saving ? 'not-allowed' : 'pointer' }}
+      >
+        {saving ? 'Completing…' : 'Complete Meet Lead Step'}
+      </button>
+    </Sheet>
+  );
+}
+
+// ── Generic step confirm panel (inline, for custom steps) ──────────
+function GenericStepConfirm({ step, onConfirm, onCancel }) {
+  return (
+    <div style={{ background: '#EFF6FF', border: '1.5px solid #93C5FD', borderRadius: 14, padding: '16px', marginTop: 8 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: c.navy, marginBottom: 4 }}>
+        Mark "{step.name}" as complete?
+      </div>
+      <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 14 }}>
+        This will advance the lead to the next step.
+      </div>
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button
+          onClick={onConfirm}
+          style={{ flex: 1, padding: '11px', borderRadius: 40, background: c.primary, border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+        >
+          Yes, Complete
+        </button>
+        <button
+          onClick={onCancel}
+          style={{ flex: 1, padding: '11px', borderRadius: 40, background: '#fff', border: '1px solid #D1D5DB', color: '#374151', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Activity Log panel ─────────────────────────────────────────────
 function ActivityLog({ lead }) {
   const logs = [
@@ -326,8 +435,9 @@ export default function OnboardingJourneyScreen({ navigate, lead: initialLead, u
   const [loading, setLoading]         = useState(true);
   const [showConvert, setShowConvert] = useState(false);
   const [converting, setConverting]   = useState(false);
-  const [confirmStep, setConfirmStep] = useState(null);
-  const [showCallLog, setShowCallLog] = useState(false);
+  const [confirmStep, setConfirmStep] = useState(null);   // generic steps
+  const [meetLeadStep, setMeetLeadStep] = useState(null); // meet_lead sheet
+  const [showCallLog, setShowCallLog]   = useState(false);
   const [showVisitLog, setShowVisitLog] = useState(false);
   const userRole = user?.role || 'FIELD_OFFICER';
 
@@ -341,7 +451,14 @@ export default function OnboardingJourneyScreen({ navigate, lead: initialLead, u
       .finally(() => setLoading(false));
   }, [initialLead.id]);
 
-  const handleComplete = (step) => setConfirmStep(step);
+  const handleComplete = (step) => {
+    const defId = step.stepDefId || step.name?.toLowerCase().replace(/\s+/g, '_');
+    if (defId === 'meet_lead') {
+      setMeetLeadStep(step);
+    } else {
+      setConfirmStep(step);
+    }
+  };
 
   const doComplete = async () => {
     const step = confirmStep;
@@ -422,21 +539,13 @@ export default function OnboardingJourneyScreen({ navigate, lead: initialLead, u
           <StepRow key={step.id} step={step} onComplete={handleComplete} userRole={userRole} />
         ))}
 
-        {/* Inline step confirm dialog */}
+        {/* Inline confirm for generic/custom steps */}
         {confirmStep && (
-          <div style={{ ...card, background: '#EFF6FF', border: '1.5px solid #93C5FD', marginTop: 8 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: c.navy, marginBottom: 10 }}>
-              Mark "{confirmStep.name}" as complete?
-            </div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={doComplete} style={{ flex: 1, padding: '10px', borderRadius: 40, background: c.primary, border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-                Yes, Complete
-              </button>
-              <button onClick={() => setConfirmStep(null)} style={{ flex: 1, padding: '10px', borderRadius: 40, background: '#fff', border: '1px solid #D1D5DB', color: '#374151', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                Cancel
-              </button>
-            </div>
-          </div>
+          <GenericStepConfirm
+            step={confirmStep}
+            onConfirm={doComplete}
+            onCancel={() => setConfirmStep(null)}
+          />
         )}
 
         {/* Convert banner */}
@@ -526,6 +635,18 @@ export default function OnboardingJourneyScreen({ navigate, lead: initialLead, u
           user={user}
           onClose={() => setShowVisitLog(false)}
           onSaved={refreshLead}
+        />
+      )}
+      {meetLeadStep && (
+        <MeetLeadSheet
+          lead={lead}
+          step={meetLeadStep}
+          user={user}
+          onClose={() => setMeetLeadStep(null)}
+          onCompleted={async () => {
+            const updated = await api.getLead(lead.id).catch(() => null);
+            if (updated) setLead(updated);
+          }}
         />
       )}
 

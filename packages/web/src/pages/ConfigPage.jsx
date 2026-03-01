@@ -210,36 +210,123 @@ function PrequalTab({ config, saving, saved, tabLabel, onDirty, onSave }) {
 // ── Tab: Workflow ─────────────────────────────────────────────────────────────
 
 function WorkflowTab({ config, saving, saved, tabLabel, onDirty, onSave }) {
-  const [local, setLocal] = useState(() => JSON.parse(JSON.stringify(config || {})));
+  const [local, setLocal]       = useState(() => JSON.parse(JSON.stringify(config || {})));
+  const [newLabel, setNewLabel] = useState('');
 
-  const updateStep = (i, field, val) => { onDirty(); setLocal(l => ({ ...l, steps: l.steps.map((s, j) => j === i ? { ...s, [field]: val } : s) })); };
+  const sorted = [...(local.steps || [])].sort((a, b) => a.order - b.order);
+
+  const updateStep = (id, field, val) => {
+    onDirty();
+    setLocal(l => ({ ...l, steps: l.steps.map(s => s.id === id ? { ...s, [field]: val } : s) }));
+  };
+
+  const moveStep = (id, dir) => {
+    onDirty();
+    setLocal(l => {
+      const steps = [...l.steps].sort((a, b) => a.order - b.order);
+      const idx   = steps.findIndex(s => s.id === id);
+      const swap  = idx + dir;
+      if (swap < 0 || swap >= steps.length) return l;
+      // Swap order values
+      const newSteps = steps.map((s, i) => {
+        if (i === idx)  return { ...s, order: steps[swap].order };
+        if (i === swap) return { ...s, order: steps[idx].order };
+        return s;
+      });
+      return { ...l, steps: newSteps };
+    });
+  };
+
+  const removeStep = (id) => {
+    onDirty();
+    setLocal(l => {
+      const remaining = l.steps.filter(s => s.id !== id)
+        .sort((a, b) => a.order - b.order)
+        .map((s, i) => ({ ...s, order: i + 1 })); // re-number
+      return { ...l, steps: remaining };
+    });
+  };
+
+  const addStep = () => {
+    const label = newLabel.trim();
+    if (!label) return;
+    onDirty();
+    setLocal(l => {
+      const maxOrder = (l.steps || []).reduce((m, s) => Math.max(m, s.order), 0);
+      const id = label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+      // Ensure unique id
+      const uniqueId = (l.steps || []).some(s => s.id === id) ? id + '_' + (maxOrder + 1) : id;
+      return { ...l, steps: [...(l.steps || []), { id: uniqueId, label, role: 'Field Officer', order: maxOrder + 1 }] };
+    });
+    setNewLabel('');
+  };
 
   return (
     <div>
-      <Section title="Workflow Steps" description="Define the onboarding journey steps and the role responsible for each step.">
-        {(local.steps || []).sort((a, b) => a.order - b.order).map((step, i) => (
-          <div key={step.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: `1px solid #F3F4F6` }}>
+      <Section title="Workflow Steps" description="Define the onboarding journey steps and the role responsible for each step. New leads will be created with these steps in order.">
+        {sorted.map((step, i) => (
+          <div key={step.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: `1px solid #F3F4F6` }}>
+            {/* Order bubble */}
             <div style={{ width: 28, height: 28, borderRadius: 14, background: '#EBF5FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: col.blue, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
               {step.order}
             </div>
-            <div style={{ flex: 1, fontWeight: 600, fontSize: 14 }}>{step.label}</div>
-            <div style={{ fontSize: 12, color: col.muted }}>Assigned to:</div>
+            {/* Reorder buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0 }}>
+              <button onClick={() => moveStep(step.id, -1)} disabled={i === 0}
+                style={{ padding: '1px 5px', fontSize: 10, border: `1px solid ${col.border}`, borderRadius: 3, background: i === 0 ? '#F9FAFB' : '#fff', cursor: i === 0 ? 'default' : 'pointer', color: i === 0 ? '#D1D5DB' : col.muted, lineHeight: 1 }}>
+                ▲
+              </button>
+              <button onClick={() => moveStep(step.id, 1)} disabled={i === sorted.length - 1}
+                style={{ padding: '1px 5px', fontSize: 10, border: `1px solid ${col.border}`, borderRadius: 3, background: i === sorted.length - 1 ? '#F9FAFB' : '#fff', cursor: i === sorted.length - 1 ? 'default' : 'pointer', color: i === sorted.length - 1 ? '#D1D5DB' : col.muted, lineHeight: 1 }}>
+                ▼
+              </button>
+            </div>
+            {/* Label */}
+            <input
+              value={step.label}
+              onChange={e => updateStep(step.id, 'label', e.target.value)}
+              style={{ flex: 1, padding: '5px 10px', border: `1px solid ${col.border}`, borderRadius: 5, fontSize: 14, fontWeight: 600, color: col.navy, outline: 'none' }}
+            />
+            {/* Role */}
+            <div style={{ fontSize: 12, color: col.muted, flexShrink: 0 }}>Role:</div>
             <select
               value={step.role}
-              onChange={e => updateStep(i, 'role', e.target.value)}
+              onChange={e => updateStep(step.id, 'role', e.target.value)}
               style={{ padding: '5px 10px', border: `1px solid ${col.border}`, borderRadius: 5, fontSize: 13, cursor: 'pointer' }}
             >
               {['Field Officer', 'Hub Team', 'Branch Manager'].map(r => <option key={r}>{r}</option>)}
             </select>
+            {/* Remove */}
+            <button
+              onClick={() => { if (window.confirm(`Remove step "${step.label}"?`)) removeStep(step.id); }}
+              title="Remove this step"
+              style={{ padding: '4px 8px', border: `1px solid #FECACA`, borderRadius: 4, background: '#FEF2F2', color: '#EF4444', cursor: 'pointer', fontSize: 14, lineHeight: 1, flexShrink: 0 }}
+            >×</button>
           </div>
         ))}
+
+        {/* Add new step */}
+        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+          <input
+            value={newLabel}
+            onChange={e => setNewLabel(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addStep(); } }}
+            placeholder="New step name (e.g. Document Verification)…"
+            style={{ flex: 1, padding: '7px 12px', border: `1px solid ${col.border}`, borderRadius: 6, fontSize: 13, outline: 'none' }}
+          />
+          <button
+            onClick={addStep}
+            disabled={!newLabel.trim()}
+            style={{ padding: '7px 16px', background: newLabel.trim() ? col.blue : '#9CA3AF', color: '#fff', border: 'none', borderRadius: 6, cursor: newLabel.trim() ? 'pointer' : 'not-allowed', fontSize: 13, fontWeight: 600, flexShrink: 0 }}
+          >+ Add Step</button>
+        </div>
       </Section>
 
       <Section title="Status Transitions" description="Allowed lead status changes (read-only — contact admin to modify state machine).">
         <div style={{ background: '#F9FAFB', borderRadius: 8, padding: '12px 16px' }}>
           {Object.entries(local.statusTransitions || {}).map(([from, to]) => (
             <div key={from} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-              <span style={{ fontFamily: 'monospace', fontWeight: 700, color: col.navy, minWidth: 160, fontSize: 12 }}>{from}</span>
+              <span style={{ fontFamily: 'monospace', fontWeight: 700, color: col.navy, minWidth: 180, fontSize: 12 }}>{from}</span>
               <span style={{ color: col.muted }}>→</span>
               <span>
                 {to.length === 0

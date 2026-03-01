@@ -211,7 +211,26 @@ export default function LeadsPoolPage({ user }) {
     } finally { setBulkAssigning(false); }
   };
 
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'pipeline'
+
   const TABLE_COLS = ['', 'Created On', 'Lead ID', 'Customer Name', 'Mobile', 'Lead Type', 'Source', 'Branch / Village / Centre', 'Field Officer', 'Aging', 'Status', ''];
+
+  // Pipeline: quick approve / reject without opening detail page
+  const handleQuickApprove = async (lead, e) => {
+    e.stopPropagation();
+    try {
+      await api.updateLead(lead.id, { status: 'QUALIFIED', assignedTo: lead.assignedTo || 'Field Officer' });
+      await load();
+    } catch (_) {}
+  };
+  const handleQuickReject = async (lead, e) => {
+    e.stopPropagation();
+    if (!window.confirm(`Reject "${lead.name}"?`)) return;
+    try {
+      await api.updateLead(lead.id, { status: 'REJECTED', rejectionReason: 'Rejected via Pipeline view' });
+      await load();
+    } catch (_) {}
+  };
 
   return (
     <div style={s.page}>
@@ -260,6 +279,11 @@ export default function LeadsPoolPage({ user }) {
           {activeCount > 0 && (
             <button onClick={clearFilters} style={{ fontSize: 12, color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Clear</button>
           )}
+          {/* View mode toggle */}
+          <div style={{ display: 'flex', border: '1px solid #CFD6DD', borderRadius: 6, overflow: 'hidden' }}>
+            <button onClick={() => setViewMode('list')} style={{ padding: '7px 12px', border: 'none', background: viewMode === 'list' ? '#1874D0' : '#fff', color: viewMode === 'list' ? '#fff' : '#374151', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>☰ List</button>
+            <button onClick={() => setViewMode('pipeline')} style={{ padding: '7px 12px', border: 'none', borderLeft: '1px solid #CFD6DD', background: viewMode === 'pipeline' ? '#1874D0' : '#fff', color: viewMode === 'pipeline' ? '#fff' : '#374151', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>⬜ Pipeline</button>
+          </div>
           <button style={s.bulkBtn} onClick={() => navigate('/bulk-uploads')}>📋 Upload Monitor</button>
           <button style={s.bulkBtn} onClick={() => setShowBulkUpload(true)}>⬆ Bulk Upload</button>
           <button style={s.newLeadBtn} onClick={() => setShowNewLead(true)}>+ New Lead</button>
@@ -327,8 +351,64 @@ export default function LeadsPoolPage({ user }) {
         {loading ? 'Loading…' : `${filtered.length}${filtered.length !== leads.length ? ` of ${leads.length}` : ''} lead${filtered.length !== 1 ? 's' : ''} found`}
       </p>
 
-      {/* Table */}
-      <div style={s.tableWrap}>
+      {/* ── Pipeline / Kanban View ── */}
+      {viewMode === 'pipeline' && (() => {
+        const PIPELINE_COLS = [
+          { key: 'APPROVAL_PENDING', label: 'Approval Pending', color: '#FA8D29', bg: '#FEF6EC', border: '#FDE68A' },
+          { key: 'QUALIFIED',        label: 'Qualified',        color: '#1874D0', bg: '#EBF5FF', border: '#93C5FD' },
+          { key: 'CONVERTED',        label: 'Converted',        color: '#10B981', bg: '#ECFDF5', border: '#6EE7B7' },
+          { key: 'REJECTED',         label: 'Rejected',         color: '#EF4444', bg: '#FEF2F2', border: '#FECACA' },
+        ];
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${PIPELINE_COLS.length}, 1fr)`, gap: 12, alignItems: 'start', marginBottom: 16 }}>
+            {PIPELINE_COLS.map(col => {
+              const colLeads = filtered.filter(l => l.status === col.key);
+              return (
+                <div key={col.key} style={{ background: col.bg, border: `1.5px solid ${col.border}`, borderRadius: 10, overflow: 'hidden' }}>
+                  {/* Column header */}
+                  <div style={{ padding: '10px 14px', borderBottom: `1px solid ${col.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: col.color, textTransform: 'uppercase', letterSpacing: 0.5 }}>{col.label}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: col.color, color: '#fff' }}>{colLeads.length}</span>
+                  </div>
+                  {/* Cards */}
+                  <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 520, overflowY: 'auto' }}>
+                    {colLeads.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '20px 8px', color: '#9CA3AF', fontSize: 12 }}>No leads</div>
+                    ) : colLeads.map(lead => {
+                      const breached = isSLABreach(lead);
+                      return (
+                        <div
+                          key={lead.id}
+                          onClick={() => navigate(`/leads/${lead.id}`)}
+                          style={{ background: '#fff', border: `1px solid ${breached ? '#FCA5A5' : '#E5E7EB'}`, borderLeft: `3px solid ${col.color}`, borderRadius: 8, padding: '10px 12px', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
+                        >
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#003366', marginBottom: 3 }}>{lead.name}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+                            {(lead.source || lead.leadSource) && <SourceBadge source={lead.source || lead.leadSource} small />}
+                            {lead.createdAt && <AgingBadge createdAt={lead.createdAt} isBreached={breached} />}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#6B7280', marginBottom: col.key === 'APPROVAL_PENDING' ? 8 : 0 }}>
+                            {lead.assignedTo ? `FO: ${lead.assignedTo}` : <em>Unassigned</em>}
+                          </div>
+                          {col.key === 'APPROVAL_PENDING' && (
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button onClick={e => handleQuickApprove(lead, e)} style={{ flex: 1, padding: '4px 0', fontSize: 11, fontWeight: 700, background: '#1874D0', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>✓ Approve</button>
+                              <button onClick={e => handleQuickReject(lead, e)} style={{ flex: 1, padding: '4px 0', fontSize: 11, fontWeight: 700, background: '#fff', color: '#EF4444', border: '1px solid #FECACA', borderRadius: 4, cursor: 'pointer' }}>✕ Reject</button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
+      {/* ── Table (List View) ── */}
+      {viewMode === 'list' && <div style={s.tableWrap}>
         <table style={s.table}>
           <thead>
             <tr>
@@ -403,8 +483,10 @@ export default function LeadsPoolPage({ user }) {
             })}
           </tbody>
         </table>
-      </div>
+      </div>}
 
+      {/* Pagination — list view only */}
+      {viewMode === 'list' && <></>}
       {/* Pagination */}
       <div style={s.pagination}>
         <span style={{ fontSize: 13, color: '#6B7280' }}>

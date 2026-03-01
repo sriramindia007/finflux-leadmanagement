@@ -324,6 +324,9 @@ export default function LeadDetailPage() {
   const [startingOver, setStartingOver]   = useState(false);
   const [noteText, setNoteText]           = useState('');
   const [addingNote, setAddingNote]       = useState(false);
+  const [visitOutcome, setVisitOutcome]   = useState('');
+  const [visitNotes, setVisitNotes]       = useState('');
+  const [completingStep, setCompletingStep] = useState(false);
 
   const load = async () => {
     try { const d = await api.getLead(id); setLead(d); } catch (_) {} finally { setLoading(false); }
@@ -421,6 +424,26 @@ export default function LeadDetailPage() {
     } finally { setReassigning(false); }
   };
 
+  const handleGenericStepComplete = async (step, notes) => {
+    setCompletingStep(true);
+    try {
+      await api.updateStep(id, step.id, { status: 'completed', completedAt: new Date().toISOString(), completedBy: 'Hub Team', notes });
+      await load();
+    } finally { setCompletingStep(false); }
+  };
+
+  const handleMeetLeadComplete = async (step) => {
+    if (!visitOutcome) return;
+    setCompletingStep(true);
+    try {
+      await api.addVisitLog(id, { outcome: visitOutcome, notes: visitNotes, visitedBy: lead.assignedTo || 'Field Officer', visitedAt: new Date().toISOString() });
+      await api.updateStep(id, step.id, { status: 'completed', completedAt: new Date().toISOString(), completedBy: lead.assignedTo || 'Field Officer' });
+      setVisitOutcome('');
+      setVisitNotes('');
+      await load();
+    } finally { setCompletingStep(false); }
+  };
+
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#9CA3AF' }}>Loading...</div>;
   if (!lead)   return <div style={{ padding: 40, textAlign: 'center', color: '#EF4444' }}>Lead not found</div>;
 
@@ -465,6 +488,10 @@ export default function LeadDetailPage() {
       : {}),
   };
   const activeStep = lead.steps?.find(s => s.status === 'in_progress') || lead.steps?.find(s => s.status === 'pending');
+  // Resolve step definition id — new leads have stepDefId; old leads fall back from name
+  const activeStepDefId = activeStep
+    ? (activeStep.stepDefId || activeStep.name?.toLowerCase().replace(/\s+/g, '_'))
+    : null;
 
   return (
     <div style={s.page}>
@@ -511,22 +538,155 @@ export default function LeadDetailPage() {
                     ? 'All Steps Complete — Ready to Convert'
                     : (activeStep?.name || 'All Steps Complete')}
               </span>
-              {!isTerminal && !canConvert && lead.assignedTo && activeStep && !isMeetLeadActive && (
-                <span style={{ fontSize: 13, color: '#F59E0B', marginLeft: 12 }}>
-                  Due in 2h • Assigned to {lead.assignedTo}{' '}
+              {!isTerminal && !canConvert && lead.assignedTo && activeStep && (
+                <span style={{ fontSize: 13, color: '#9CA3AF', marginLeft: 12 }}>
+                  Assigned to {lead.assignedTo}{' '}
                   <button onClick={() => setShowReassign(true)} style={{ background: 'none', border: 'none', color: '#1874D0', cursor: 'pointer', fontSize: 13, textDecoration: 'underline' }}>
                     Re-assign
                   </button>
                 </span>
-              )}
-              {isMeetLeadActive && (
-                <span style={{ fontSize: 13, color: '#6B7280', marginLeft: 12 }}>Field officer will complete this step on mobile</span>
               )}
               {isTerminal && lead.rejectionReason && (
                 <span style={{ fontSize: 13, color: '#EF4444', marginLeft: 12 }}>Reason: {lead.rejectionReason}</span>
               )}
             </div>
           </div>
+
+          {/* ── Step Action Panel ── */}
+          {activeStep && !isTerminal && !canConvert && (() => {
+            const sid = activeStepDefId;
+
+            // ── Basic Details panel ──────────────────────────────
+            if (sid === 'basic_details') {
+              const checks = [
+                { label: 'Customer name',  ok: !!lead.name },
+                { label: 'Mobile number',  ok: !!lead.mobile },
+                { label: 'Work profile',   ok: !!lead.work },
+                { label: 'Lead type',      ok: !!lead.leadType },
+                { label: 'Loan amount',    ok: !!lead.loanAmount },
+                { label: 'Address / location', ok: !!(lead.state || lead.locality) },
+              ];
+              const allGood = checks.every(c => c.ok);
+              return (
+                <div style={sp.panel}>
+                  <div style={sp.title}>📋 Basic Details — Review & Complete</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                    {checks.map(c => (
+                      <span key={c.label} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 999, background: c.ok ? '#ECFDF5' : '#FEF2F2', color: c.ok ? '#059669' : '#DC2626', border: `1px solid ${c.ok ? '#A7F3D0' : '#FECACA'}`, fontWeight: 600 }}>
+                        {c.ok ? '✓' : '✗'} {c.label}
+                      </span>
+                    ))}
+                  </div>
+                  {!allGood && <div style={{ fontSize: 12, color: '#F59E0B', marginBottom: 10 }}>⚠ Some fields are missing. You can still complete this step once the field officer fills them in.</div>}
+                  <button
+                    onClick={() => handleGenericStepComplete(activeStep, '')}
+                    disabled={completingStep}
+                    style={{ ...sp.btn, background: completingStep ? '#9CA3AF' : '#1874D0' }}
+                  >
+                    {completingStep ? 'Saving…' : '✓ Mark Basic Details Complete'}
+                  </button>
+                </div>
+              );
+            }
+
+            // ── Qualification panel ──────────────────────────────
+            if (sid === 'qualification') {
+              const checks = [
+                { label: `Call log recorded (${(lead.callLogs || []).length})`, ok: hasCallLog },
+                { label: 'No pending follow-up', ok: !hasPendingFollowUp },
+                { label: 'Pre-qualification run', ok: !!lead.prequalResult },
+              ];
+              return (
+                <div style={sp.panel}>
+                  <div style={sp.title}>🔍 Qualification — Hub Team Review</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                    {checks.map(c => (
+                      <span key={c.label} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 999, background: c.ok ? '#ECFDF5' : '#FEF3C7', color: c.ok ? '#059669' : '#92400E', border: `1px solid ${c.ok ? '#A7F3D0' : '#FDE68A'}`, fontWeight: 600 }}>
+                        {c.ok ? '✓' : '⚪'} {c.label}
+                      </span>
+                    ))}
+                  </div>
+                  {!hasCallLog && (
+                    <div style={{ marginBottom: 10 }}>
+                      <button onClick={() => setShowCallLog(true)} style={{ padding: '6px 14px', background: '#FEF3C7', border: '1px solid #F59E0B', borderRadius: 6, color: '#92400E', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                        + Add Call Log first
+                      </button>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <button
+                      onClick={handleApprove}
+                      disabled={actioning || !canApprove}
+                      title={!hasCallLog ? 'Add call log first' : hasPendingFollowUp ? 'Resolve follow-up first' : ''}
+                      style={{ ...sp.btn, background: !canApprove ? '#9CA3AF' : '#1874D0', cursor: !canApprove ? 'not-allowed' : 'pointer' }}
+                    >
+                      {actioning ? 'Approving…' : '✓ Approve Lead →'}
+                    </button>
+                    <button
+                      onClick={() => setShowReject(true)}
+                      disabled={actioning}
+                      style={{ ...sp.btn, background: '#fff', color: '#EF4444', border: '1.5px solid #EF4444' }}
+                    >
+                      ✕ Reject Lead
+                    </button>
+                  </div>
+                </div>
+              );
+            }
+
+            // ── Meet Lead panel ──────────────────────────────────
+            if (sid === 'meet_lead') {
+              const outcomes = ['Met', 'Not Met', 'Rescheduled'];
+              return (
+                <div style={sp.panel}>
+                  <div style={sp.title}>📍 Meet Lead — Record Visit Outcome</div>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                    {outcomes.map(o => (
+                      <button key={o} onClick={() => setVisitOutcome(o)}
+                        style={{ padding: '7px 18px', border: `2px solid ${visitOutcome === o ? '#1874D0' : '#E5E7EB'}`, borderRadius: 8, background: visitOutcome === o ? '#EFF6FF' : '#fff', color: visitOutcome === o ? '#1874D0' : '#374151', fontWeight: visitOutcome === o ? 700 : 400, cursor: 'pointer', fontSize: 13 }}>
+                        {o === 'Met' ? '✓ Met' : o === 'Not Met' ? '✗ Not Met' : '📅 Rescheduled'}
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    value={visitNotes}
+                    onChange={e => setVisitNotes(e.target.value)}
+                    placeholder="Visit notes (optional)…"
+                    rows={2}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #CFD6DD', borderRadius: 6, fontSize: 13, resize: 'vertical', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', marginBottom: 10 }}
+                  />
+                  <button
+                    onClick={() => handleMeetLeadComplete(activeStep)}
+                    disabled={!visitOutcome || completingStep}
+                    style={{ ...sp.btn, background: !visitOutcome || completingStep ? '#9CA3AF' : '#10B981', cursor: !visitOutcome || completingStep ? 'not-allowed' : 'pointer' }}
+                  >
+                    {completingStep ? 'Saving…' : '✓ Record Outcome & Complete Step'}
+                  </button>
+                </div>
+              );
+            }
+
+            // ── Generic step panel ───────────────────────────────
+            return (
+              <div style={sp.panel}>
+                <div style={sp.title}>⚙ {activeStep.name} — {activeStep.role || 'Team'} Action</div>
+                <textarea
+                  value={visitNotes}
+                  onChange={e => setVisitNotes(e.target.value)}
+                  placeholder="Add completion notes (optional)…"
+                  rows={2}
+                  style={{ width: '100%', padding: '8px 10px', border: '1px solid #CFD6DD', borderRadius: 6, fontSize: 13, resize: 'vertical', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', marginBottom: 10 }}
+                />
+                <button
+                  onClick={() => handleGenericStepComplete(activeStep, visitNotes)}
+                  disabled={completingStep}
+                  style={{ ...sp.btn, background: completingStep ? '#9CA3AF' : '#1874D0' }}
+                >
+                  {completingStep ? 'Saving…' : `✓ Mark "${activeStep.name}" Complete`}
+                </button>
+              </div>
+            );
+          })()}
 
           {/* Correction Banner — shown when hub sent lead back for FO correction */}
           {lead.isCorrection && (
@@ -777,6 +937,13 @@ export default function LeadDetailPage() {
     </div>
   );
 }
+
+// Step Action Panel styles
+const sp = {
+  panel: { background: '#F8FAFF', border: '1.5px solid #BFDBFE', borderRadius: 10, padding: '16px 20px', marginBottom: 16 },
+  title: { fontSize: 14, fontWeight: 700, color: '#1E40AF', marginBottom: 12 },
+  btn:   { padding: '9px 20px', border: 'none', borderRadius: 6, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' },
+};
 
 const s = {
   page: { display: 'flex', flexDirection: 'column', height: 'calc(100vh - 52px)' },

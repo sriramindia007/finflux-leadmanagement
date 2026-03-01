@@ -61,6 +61,56 @@ let leads = [...mockLeads];
 // In-memory bulk-upload job log
 let uploadJobs = [];
 
+// ── In-memory workflow / config store ─────────────────────────
+let workflowConfig = {
+  steps: [
+    { id: 'basic_details', label: 'Basic Details', role: 'Field Officer', order: 1 },
+    { id: 'qualification', label: 'Qualification', role: 'Hub Team',      order: 2 },
+    { id: 'meet_lead',     label: 'Meet Lead',     role: 'Field Officer', order: 3 },
+  ],
+  statusTransitions: {
+    APPROVAL_PENDING: ['QUALIFIED', 'REJECTED'],
+    QUALIFIED:        ['CONVERTED', 'REJECTED'],
+    CONVERTED:        [],
+    REJECTED:         [],
+  },
+};
+
+// Helper: build steps array from workflowConfig for a new lead
+function buildStepsFromConfig() {
+  return [...workflowConfig.steps]
+    .sort((a, b) => a.order - b.order)
+    .map((s, i) => ({
+      id:          uuidv4(),
+      name:        s.label,
+      stepDefId:   s.id,      // link back to the config step definition
+      role:        s.role,
+      status:      i === 0 ? 'in_progress' : 'pending',
+      completedAt: null,
+      completedBy: null,
+    }));
+}
+
+// ── GET /api/config ────────────────────────────────────────────
+app.get('/api/config', (req, res) => {
+  res.json({ workflow: workflowConfig });
+});
+
+// ── GET /api/config/:key ───────────────────────────────────────
+app.get('/api/config/:key', (req, res) => {
+  if (req.params.key === 'workflow') return res.json(workflowConfig);
+  res.status(404).json({ error: 'Unknown config key' });
+});
+
+// ── PUT /api/config/:key ───────────────────────────────────────
+app.put('/api/config/:key', (req, res) => {
+  if (req.params.key === 'workflow') {
+    workflowConfig = { ...workflowConfig, ...req.body };
+    return res.json({ ok: true, key: 'workflow', workflow: workflowConfig });
+  }
+  res.status(404).json({ error: 'Unknown config key' });
+});
+
 // ── GET /api/pincode/:pin ──────────────────────────────────────
 app.get('/api/pincode/:pin', (req, res) => {
   const info = PINCODE_DB[req.params.pin];
@@ -230,11 +280,7 @@ app.post('/api/leads/bulk', (req, res) => {
       createdAt: new Date().toISOString(),
       createdBy: 'Bulk Upload',
       status: 'APPROVAL_PENDING',
-      steps: [
-        { id: uuidv4(), name: 'Basic Details', status: 'in_progress', completedAt: null, completedBy: null },
-        { id: uuidv4(), name: 'Qualification', status: 'pending',     completedAt: null, completedBy: null },
-        { id: uuidv4(), name: 'Meet Lead',     status: 'pending',     completedAt: null, completedBy: null },
-      ],
+      steps: buildStepsFromConfig(),
       callLogs: [],
       visitLogs: [],
     };
@@ -293,11 +339,7 @@ app.post('/api/leads', (req, res) => {
     id: String(Date.now()).padStart(12, '0'),
     createdAt: new Date().toISOString(),
     status: 'APPROVAL_PENDING',
-    steps: [
-      { id: uuidv4(), name: 'Basic Details', status: 'in_progress', completedAt: null, completedBy: null },
-      { id: uuidv4(), name: 'Qualification', status: 'pending', completedAt: null, completedBy: null },
-      { id: uuidv4(), name: 'Meet Lead', status: 'pending', completedAt: null, completedBy: null }
-    ],
+    steps: buildStepsFromConfig(),
     callLogs: [],
     visitLogs: []
   };
@@ -374,11 +416,7 @@ app.post('/api/leads/:id/start-over', (req, res) => {
     correctionNote: reason || '',
     correctionBy:   by   || 'Hub Manager',
     correctionAt:   new Date().toISOString(),
-    steps: [
-      { id: uuidv4(), name: 'Basic Details', status: 'in_progress', completedAt: null, completedBy: null },
-      { id: uuidv4(), name: 'Qualification', status: 'pending',     completedAt: null, completedBy: null },
-      { id: uuidv4(), name: 'Meet Lead',     status: 'pending',     completedAt: null, completedBy: null },
-    ],
+    steps: buildStepsFromConfig(),
   };
   res.json(leads[idx]);
 });
@@ -452,11 +490,7 @@ app.post('/api/crm/leads', requireCrmKey, (req, res) => {
     branch: branch || '',
     centre: centre || '',
     assignedTo: assignedTo || '',
-    steps: [
-      { id: uuidv4(), name: 'Basic Details', status: 'in_progress', completedAt: null, completedBy: null },
-      { id: uuidv4(), name: 'Qualification', status: 'pending',     completedAt: null, completedBy: null },
-      { id: uuidv4(), name: 'Meet Lead',     status: 'pending',     completedAt: null, completedBy: null },
-    ],
+    steps: buildStepsFromConfig(),
     callLogs: [],
     visitLogs: [],
   };
