@@ -78,17 +78,20 @@ let workflowConfig = {
 
 // Helper: build steps array from workflowConfig for a new lead
 function buildStepsFromConfig() {
-  return [...workflowConfig.steps]
-    .sort((a, b) => a.order - b.order)
-    .map((s, i) => ({
-      id:          uuidv4(),
-      name:        s.label,
-      stepDefId:   s.id,      // link back to the config step definition
-      role:        s.role,
-      status:      i === 0 ? 'in_progress' : 'pending',
-      completedAt: null,
-      completedBy: null,
-    }));
+  const sorted = [...(workflowConfig.steps || [])].sort((a, b) => a.order - b.order);
+  if (sorted.length === 0) {
+    // Safety: if all steps were deleted via ConfigPage, fall back to 1 default step
+    return [{ id: uuidv4(), name: 'Basic Details', stepDefId: 'basic_details', role: 'Field Officer', status: 'in_progress', completedAt: null, completedBy: null }];
+  }
+  return sorted.map((s, i) => ({
+    id:          uuidv4(),
+    name:        s.label,
+    stepDefId:   s.id,      // link back to the config step definition
+    role:        s.role,
+    status:      i === 0 ? 'in_progress' : 'pending',
+    completedAt: null,
+    completedBy: null,
+  }));
 }
 
 // ── GET /api/config ────────────────────────────────────────────
@@ -515,14 +518,19 @@ app.get('/api/crm/leads/:externalId', requireCrmKey, (req, res) => {
 });
 
 // ── PATCH /api/leads/:id/steps/:stepId ────────────────────────
+const STEP_ALLOWED_FIELDS = new Set(['status', 'completedAt', 'completedBy', 'notes']);
+
 app.patch('/api/leads/:id/steps/:stepId', (req, res) => {
   const lead = leads.find(l => l.id === req.params.id);
   if (!lead) return res.status(404).json({ error: 'Lead not found' });
   const stepIdx = lead.steps.findIndex(s => s.id === req.params.stepId);
   if (stepIdx === -1) return res.status(404).json({ error: 'Step not found' });
-  Object.assign(lead.steps[stepIdx], req.body);
+  // Only allow safe mutable fields — never overwrite id, name, stepDefId, role
+  const patch = {};
+  Object.keys(req.body).forEach(k => { if (STEP_ALLOWED_FIELDS.has(k)) patch[k] = req.body[k]; });
+  Object.assign(lead.steps[stepIdx], patch);
   // Auto-advance next step to in_progress when current is completed
-  if (req.body.status === 'completed' && stepIdx + 1 < lead.steps.length) {
+  if (patch.status === 'completed' && stepIdx + 1 < lead.steps.length) {
     if (lead.steps[stepIdx + 1].status === 'pending') {
       lead.steps[stepIdx + 1].status = 'in_progress';
     }

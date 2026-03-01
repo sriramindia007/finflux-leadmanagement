@@ -319,7 +319,6 @@ export default function LeadDetailPage() {
   const [reassigning, setReassigning]   = useState(false);
   const [reassignError, setReassignError] = useState('');
   const [showReject, setShowReject]     = useState(false);
-  const [prequalify, setPrequalify]     = useState({ status: 'idle', result: null }); // idle|loading|done|error
   const [showStartOver, setShowStartOver] = useState(false);
   const [startingOver, setStartingOver]   = useState(false);
   const [noteText, setNoteText]           = useState('');
@@ -327,6 +326,12 @@ export default function LeadDetailPage() {
   const [visitOutcome, setVisitOutcome]   = useState('');
   const [visitNotes, setVisitNotes]       = useState('');
   const [completingStep, setCompletingStep] = useState(false);
+  // Initialise prequalify from persisted lead data so results survive page refresh
+  const [prequalify, setPrequalify] = useState(() =>
+    lead?.prequalResult
+      ? { status: 'done', result: lead.prequalResult }
+      : { status: 'idle', result: null }
+  );
 
   const load = async () => {
     try { const d = await api.getLead(id); setLead(d); } catch (_) {} finally { setLoading(false); }
@@ -338,14 +343,16 @@ export default function LeadDetailPage() {
     setActioning(true);
     try {
       await api.updateLead(id, { status: 'QUALIFIED', assignedTo: lead.assignedTo || 'Field Officer' });
-      const basicStep = lead.steps?.find(s => s.name === 'Basic Details' && s.status !== 'completed');
+      // Use stepDefId for config-driven step lookup (falls back to name-slug for old leads)
+      const defId = (s) => s.stepDefId || s.name?.toLowerCase().replace(/\s+/g, '_');
+      const basicStep = lead.steps?.find(s => defId(s) === 'basic_details' && s.status !== 'completed');
       if (basicStep) {
         // Mark Basic Details complete — server auto-advances Qualification to in_progress
         await api.updateStep(id, basicStep.id, { status: 'completed', completedAt: new Date().toISOString(), completedBy: 'Hub Team' });
       } else {
-        // Basic Details already done — manually advance Qualification if still pending
-        const qualStep = lead.steps?.find(s => s.name === 'Qualification' && s.status === 'pending');
-        if (qualStep) await api.updateStep(id, qualStep.id, { status: 'in_progress', completedAt: null, completedBy: null });
+        // Basic Details already done — advance Qualification if still pending
+        const qualStep = lead.steps?.find(s => defId(s) === 'qualification' && s.status === 'pending');
+        if (qualStep) await api.updateStep(id, qualStep.id, { status: 'in_progress' });
       }
       await load();
     } finally { setActioning(false); }
@@ -448,7 +455,12 @@ export default function LeadDetailPage() {
   if (!lead)   return <div style={{ padding: 40, textAlign: 'center', color: '#EF4444' }}>Lead not found</div>;
 
   const isTerminal    = ['CONVERTED', 'REJECTED'].includes(lead.status);
-  const isMeetLeadActive = lead.steps?.find(s => s.status === 'in_progress')?.name === 'Meet Lead';
+  // Use stepDefId for config-driven name-independence
+  const activeInProgress = lead.steps?.find(s => s.status === 'in_progress');
+  const activeDefId = activeInProgress
+    ? (activeInProgress.stepDefId || activeInProgress.name?.toLowerCase().replace(/\s+/g, '_'))
+    : null;
+  const isMeetLeadActive = activeDefId === 'meet_lead';
   const allStepsDone  = lead.steps?.every(s => s.status === 'completed');
   const canConvert    = lead.status === 'QUALIFIED' && allStepsDone;
   // Follow-up validation

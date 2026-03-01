@@ -218,6 +218,23 @@ export default function LeadsPoolPage({ user }) {
   // Pipeline: quick approve / reject without opening detail page
   const handleQuickApprove = async (lead, e) => {
     e.stopPropagation();
+    // Enforce call-log gate — same business rule as LeadDetailPage canApprove
+    const hasCallLog = (lead.callLogs?.length || 0) > 0;
+    if (!hasCallLog) {
+      alert(`Cannot approve "${lead.name}" — at least one call log must be recorded first. Open the lead detail to add a call log.`);
+      return;
+    }
+    // Check for unresolved follow-up
+    const sortedLogs = [...(lead.callLogs || [])].sort((a, b) => new Date(a.calledAt) - new Date(b.calledAt));
+    const hasPendingFollowUp = sortedLogs.some(log => {
+      if (!log.followUpAt) return false;
+      const due = new Date(log.followUpAt);
+      return !sortedLogs.some(l => l !== log && new Date(l.calledAt) >= due);
+    });
+    if (hasPendingFollowUp) {
+      alert(`Cannot approve "${lead.name}" — a follow-up call is still pending. Resolve the follow-up first.`);
+      return;
+    }
     try {
       await api.updateLead(lead.id, { status: 'QUALIFIED', assignedTo: lead.assignedTo || 'Field Officer' });
       await load();
@@ -486,9 +503,7 @@ export default function LeadsPoolPage({ user }) {
       </div>}
 
       {/* Pagination — list view only */}
-      {viewMode === 'list' && <></>}
-      {/* Pagination */}
-      <div style={s.pagination}>
+      {viewMode === 'list' && <div style={s.pagination}>
         <span style={{ fontSize: 13, color: '#6B7280' }}>
           {filtered.length === 0 ? '0 leads' : `${(page-1)*PER_PAGE+1}–${Math.min(page*PER_PAGE, filtered.length)} of ${filtered.length} leads`}
         </span>
@@ -499,7 +514,7 @@ export default function LeadsPoolPage({ user }) {
           <button style={s.pageBtn} onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page >= totalPages}>›</button>
           <button style={s.pageBtn} onClick={() => setPage(totalPages)} disabled={page >= totalPages}>»</button>
         </div>
-      </div>
+      </div>}
 
       {showNewLead && <NewLeadDrawer user={user} onClose={() => setShowNewLead(false)} onCreated={() => { setShowNewLead(false); load(); }} />}
       {showBulkUpload && <BulkUploadModal onClose={() => setShowBulkUpload(false)} onUploaded={load} />}
