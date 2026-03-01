@@ -11,7 +11,12 @@ async function req(path, opts = {}) {
 }
 
 export const api = {
-  getLeads:   (p = {}) => { const q = new URLSearchParams(p).toString(); return req(`/leads${q ? '?' + q : ''}`); },
+  getLeads:   (p = {}) => {
+    // Remove undefined/null/empty params before serialising
+    const clean = Object.fromEntries(Object.entries(p).filter(([, v]) => v != null && v !== ''));
+    const q = new URLSearchParams(clean).toString();
+    return req(`/leads${q ? '?' + q : ''}`);
+  },
   getLead:    (id)      => req(`/leads/${id}`),
   getStats:   ()        => req('/leads/stats'),
   createLead: (d)       => req('/leads', { method: 'POST', body: JSON.stringify(d) }),

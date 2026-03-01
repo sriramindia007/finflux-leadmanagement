@@ -210,7 +210,7 @@ export default function LeadsPoolPage({ user }) {
     } finally { setBulkAssigning(false); }
   };
 
-  const TABLE_COLS = ['', 'Created On', 'Lead ID', 'Customer Name', 'Mobile', 'Lead Type', 'Source', 'Branch / Village / Centre', 'Field Officer', 'Aging', 'Status'];
+  const TABLE_COLS = ['', 'Created On', 'Lead ID', 'Customer Name', 'Mobile', 'Lead Type', 'Source', 'Branch / Village / Centre', 'Field Officer', 'Aging', 'Status', ''];
 
   return (
     <div style={s.page}>
@@ -259,6 +259,7 @@ export default function LeadsPoolPage({ user }) {
           {activeCount > 0 && (
             <button onClick={clearFilters} style={{ fontSize: 12, color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Clear</button>
           )}
+          <button style={s.bulkBtn} onClick={() => navigate('/bulk-uploads')}>📋 Upload Monitor</button>
           <button style={s.bulkBtn} onClick={() => setShowBulkUpload(true)}>⬆ Bulk Upload</button>
           <button style={s.newLeadBtn} onClick={() => setShowNewLead(true)}>+ New Lead</button>
         </div>
@@ -379,11 +380,19 @@ export default function LeadsPoolPage({ user }) {
                     {lead.assignedTo
                       ? <span style={{ fontSize: 12, fontWeight: 500 }}>{lead.assignedTo}</span>
                       : <span style={{ fontSize: 12, color: '#F59E0B', fontStyle: 'italic' }}>Unassigned</span>}
+                    {lead.createdBy && lead.createdByRole === 'Field Officer' && lead.createdBy !== lead.assignedTo && (
+                      <div style={{ fontSize: 10, color: '#6B7280', marginTop: 2 }}>📱 Created by {lead.createdBy}</div>
+                    )}
                   </td>
                   <td style={{ ...s.td, textAlign: 'center' }}>
                     <AgingBadge createdAt={lead.createdAt} isBreached={breached} />
                   </td>
                   <td style={s.td}><StatusBadge status={lead.status} small /></td>
+                  <td style={{ ...s.td, textAlign: 'center' }}>
+                    {lead.isCorrection && (
+                      <span title={`Correction: ${lead.correctionNote || 'Hub review required'}`} style={{ fontSize: 11, fontWeight: 700, color: '#92400E', background: '#FEF3C7', borderRadius: 999, padding: '2px 8px', border: '1px solid #F59E0B', whiteSpace: 'nowrap' }}>⚠ Correction</span>
+                    )}
+                  </td>
                 </tr>
               );
             })}

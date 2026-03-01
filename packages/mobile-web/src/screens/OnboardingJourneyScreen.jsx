@@ -475,8 +475,31 @@ export default function OnboardingJourneyScreen({ navigate, lead: initialLead, u
           </div>
         )}
 
+        {/* Correction banner — shown when hub team sent lead back for correction */}
+        {lead.isCorrection && (
+          <div style={{ background: '#FFFBEB', border: '2px solid #F59E0B', borderRadius: 14, padding: '14px 16px', marginTop: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <span style={{ fontSize: 18 }}>⚠️</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: '#92400E' }}>Correction Required</span>
+            </div>
+            <div style={{ fontSize: 13, color: '#78350F', lineHeight: 1.5 }}>
+              Hub team has sent this lead back for correction.
+            </div>
+            {lead.correctionNote && (
+              <div style={{ marginTop: 8, background: '#FEF3C7', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: '#92400E', fontStyle: 'italic' }}>
+                "{lead.correctionNote}"
+              </div>
+            )}
+            {lead.correctionBy && (
+              <div style={{ fontSize: 11, color: '#B45309', marginTop: 6 }}>
+                Sent by {lead.correctionBy} · {lead.correctionAt ? new Date(lead.correctionAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Approval pending state */}
-        {lead.status === 'APPROVAL_PENDING' && (
+        {lead.status === 'APPROVAL_PENDING' && !lead.isCorrection && (
           <div style={{ ...card, background: '#FEF6EC', border: '1.5px solid #FA8D29', textAlign: 'center', marginTop: 8 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#92400E' }}>Awaiting Hub Team Approval</div>
             <div style={{ fontSize: 12, color: '#92400E', marginTop: 4 }}>Hub team will review and qualify this lead</div>

@@ -53,9 +53,13 @@ const PINCODE_DB = {
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.text({ type: 'text/csv', limit: '5mb' }));
 
 // In-memory leads store
 let leads = [...mockLeads];
+
+// In-memory bulk-upload job log
+let uploadJobs = [];
 
 // ── GET /api/pincode/:pin ──────────────────────────────────────
 app.get('/api/pincode/:pin', (req, res) => {
@@ -66,11 +70,17 @@ app.get('/api/pincode/:pin', (req, res) => {
 
 // ── GET /api/leads ─────────────────────────────────────────────
 app.get('/api/leads', (req, res) => {
-  const { status, search } = req.query;
+  const { status, search, assignedTo, isCorrection } = req.query;
   let result = [...leads];
 
   if (status && status !== 'ALL') {
     result = result.filter(l => l.status === status);
+  }
+  if (assignedTo) {
+    result = result.filter(l => l.assignedTo === assignedTo);
+  }
+  if (isCorrection === 'true') {
+    result = result.filter(l => l.isCorrection === true);
   }
   if (search) {
     const q = search.toLowerCase();
@@ -103,10 +113,24 @@ app.get('/api/leads/template', (req, res) => {
 });
 
 // ── POST /api/leads/bulk ───────────────────────────────────────
-app.post('/api/leads/bulk', upload.single('file'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+const VALID_LEAD_TYPES   = ['individual', 'group', 'jlg'];
+const VALID_LOAN_PURPOSE = ['business', 'working capital', 'asset purchase', 'business expansion', 'education', 'home improvement', 'agriculture', 'dairy farming', 'other'];
 
-  const content = req.file.buffer.toString('utf8').replace(/\r/g, '');
+app.post('/api/leads/bulk', (req, res) => {
+  // Accept CSV as text/csv body (from web app) or multipart file
+  let csvText = '';
+  if (req.headers['content-type'] && req.headers['content-type'].includes('text/csv')) {
+    // Raw CSV body (web api.js sends it this way)
+    csvText = req.body && typeof req.body === 'string' ? req.body : '';
+    if (!csvText) {
+      // body may have been parsed differently — try to reconstruct
+      return res.status(400).json({ error: 'Empty CSV body' });
+    }
+  } else {
+    return res.status(400).json({ error: 'Content-Type must be text/csv' });
+  }
+
+  const content = csvText.replace(/\r/g, '');
   const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
   if (lines.length < 2) {
     return res.status(400).json({ error: 'CSV must contain a header row and at least one data row' });
@@ -114,7 +138,8 @@ app.post('/api/leads/bulk', upload.single('file'), (req, res) => {
 
   // Parse header — lowercase+trim for loose matching
   const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-  const results = { created: 0, duplicates: 0, failed: 0, errors: [] };
+  const results = { jobId: uuidv4(), created: 0, duplicates: 0, failed: 0, errors: [], filename: 'upload.csv', uploadedAt: new Date().toISOString() };
+  const seenMobiles = new Set(); // intra-batch duplicate check
 
   for (let i = 1; i < lines.length; i++) {
     const rowNum = i + 1; // human-readable row number (1=header)
@@ -122,12 +147,14 @@ app.post('/api/leads/bulk', upload.single('file'), (req, res) => {
     const row = {};
     headers.forEach((h, idx) => { row[h] = (values[idx] || '').trim(); });
 
-    // Validate required fields
-    if (!row.name) {
+    // ── Required: name ──────────────────────────────────────────
+    if (!row.name || row.name.trim().length < 2) {
       results.failed++;
-      results.errors.push({ row: rowNum, mobile: row.mobile || '', reason: 'Name is required' });
+      results.errors.push({ row: rowNum, mobile: row.mobile || '', reason: 'Name is required (min 2 characters)' });
       continue;
     }
+
+    // ── Required: mobile ────────────────────────────────────────
     if (!row.mobile) {
       results.failed++;
       results.errors.push({ row: rowNum, mobile: '', reason: 'Mobile number is required' });
@@ -135,28 +162,61 @@ app.post('/api/leads/bulk', upload.single('file'), (req, res) => {
     }
     if (!/^[6-9]\d{9}$/.test(row.mobile)) {
       results.failed++;
-      results.errors.push({ row: rowNum, mobile: row.mobile, reason: 'Invalid mobile number — must be 10-digit starting with 6-9' });
+      results.errors.push({ row: rowNum, mobile: row.mobile, reason: 'Invalid mobile — must be 10 digits starting with 6-9' });
       continue;
     }
 
-    // Dedup check — same mobile in existing leads
+    // ── Intra-batch duplicate check ──────────────────────────────
+    if (seenMobiles.has(row.mobile)) {
+      results.duplicates++;
+      results.errors.push({ row: rowNum, mobile: row.mobile, reason: 'Duplicate within this file — same mobile appears in an earlier row' });
+      continue;
+    }
+    seenMobiles.add(row.mobile);
+
+    // ── Dedup: same mobile in existing leads ─────────────────────
     const existing = leads.find(l => l.mobile === row.mobile);
     if (existing) {
       results.duplicates++;
-      results.errors.push({ row: rowNum, mobile: row.mobile, reason: `Duplicate — existing Lead ID ${existing.id}` });
+      results.errors.push({ row: rowNum, mobile: row.mobile, reason: `Duplicate — already exists as Lead ID ${existing.id}` });
       continue;
     }
 
-    // Create lead
+    // ── Optional: loanAmount range ───────────────────────────────
+    if (row.loanamount || row.loanAmount) {
+      const amt = Number(row.loanamount || row.loanAmount);
+      if (isNaN(amt) || amt < 1000 || amt > 500000) {
+        results.failed++;
+        results.errors.push({ row: rowNum, mobile: row.mobile, reason: 'Loan amount must be between ₹1,000 and ₹5,00,000' });
+        continue;
+      }
+    }
+
+    // ── Optional: leadType validation ────────────────────────────
+    const rawLeadType = (row.leadtype || row.leadType || '').toLowerCase();
+    if (rawLeadType && !VALID_LEAD_TYPES.includes(rawLeadType)) {
+      results.failed++;
+      results.errors.push({ row: rowNum, mobile: row.mobile, reason: `Invalid Lead Type "${row.leadtype || row.leadType}" — must be Individual, Group, or JLG` });
+      continue;
+    }
+
+    // ── Optional: pincode format ─────────────────────────────────
+    if (row.pincode && !/^\d{6}$/.test(row.pincode)) {
+      results.failed++;
+      results.errors.push({ row: rowNum, mobile: row.mobile, reason: 'Invalid pincode — must be exactly 6 digits' });
+      continue;
+    }
+
+    // ── Create lead ──────────────────────────────────────────────
     const newLead = {
       id: String(Date.now() + i).padStart(12, '0'),
       name: row.name,
       mobile: row.mobile,
       work: row.work || '',
-      leadType: row.leadtype || 'Individual',
-      leadSource: row.leadsource || 'Bulk Upload',
-      loanAmount: row.loanAmount ? Number(row.loanAmount) : 0,
-      loanPurpose: row.loanpurpose || '',
+      leadType: rawLeadType ? (rawLeadType.charAt(0).toUpperCase() + rawLeadType.slice(1)) : 'Individual',
+      leadSource: row.leadsource || row.leadSource || 'Bulk Upload',
+      loanAmount: row.loanamount || row.loanAmount ? Number(row.loanamount || row.loanAmount) : 0,
+      loanPurpose: row.loanpurpose || row.loanPurpose || '',
       pincode: row.pincode || '',
       notes: row.notes || '',
       source: 'Bulk Upload',
@@ -164,9 +224,9 @@ app.post('/api/leads/bulk', upload.single('file'), (req, res) => {
       createdBy: 'Bulk Upload',
       status: 'APPROVAL_PENDING',
       steps: [
-        { id: uuidv4(), name: 'Basic Details',  status: 'in_progress', completedAt: null, completedBy: null },
-        { id: uuidv4(), name: 'Qualification',  status: 'pending',     completedAt: null, completedBy: null },
-        { id: uuidv4(), name: 'Meet Lead',       status: 'pending',     completedAt: null, completedBy: null },
+        { id: uuidv4(), name: 'Basic Details', status: 'in_progress', completedAt: null, completedBy: null },
+        { id: uuidv4(), name: 'Qualification', status: 'pending',     completedAt: null, completedBy: null },
+        { id: uuidv4(), name: 'Meet Lead',     status: 'pending',     completedAt: null, completedBy: null },
       ],
       callLogs: [],
       visitLogs: [],
@@ -175,7 +235,34 @@ app.post('/api/leads/bulk', upload.single('file'), (req, res) => {
     results.created++;
   }
 
+  // Store job for monitor
+  uploadJobs.unshift({ ...results, totalRows: lines.length - 1 });
+  if (uploadJobs.length > 50) uploadJobs = uploadJobs.slice(0, 50);
+
   res.status(200).json(results);
+});
+
+// ── GET /api/bulk-uploads ──────────────────────────────────────
+app.get('/api/bulk-uploads', (req, res) => {
+  // Return jobs summary (without per-row errors to keep response small)
+  const summary = uploadJobs.map(j => ({
+    jobId: j.jobId,
+    filename: j.filename,
+    uploadedAt: j.uploadedAt,
+    totalRows: j.totalRows,
+    created: j.created,
+    duplicates: j.duplicates,
+    failed: j.failed,
+    errorCount: j.errors ? j.errors.length : 0,
+  }));
+  res.json({ data: summary });
+});
+
+// ── GET /api/bulk-uploads/:jobId ───────────────────────────────
+app.get('/api/bulk-uploads/:jobId', (req, res) => {
+  const job = uploadJobs.find(j => j.jobId === req.params.jobId);
+  if (!job) return res.status(404).json({ error: 'Job not found' });
+  res.json(job);
 });
 
 // ── GET /api/leads/:id ─────────────────────────────────────────
@@ -258,6 +345,28 @@ app.post('/api/leads/:id/visit-logs', (req, res) => {
   const log = { id: uuidv4(), ...req.body, visitedAt: req.body.visitedAt || new Date().toISOString() };
   lead.visitLogs.push(log);
   res.status(201).json(log);
+});
+
+// ── POST /api/leads/:id/start-over ────────────────────────────
+app.post('/api/leads/:id/start-over', (req, res) => {
+  const idx = leads.findIndex(l => l.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Lead not found' });
+
+  const { reason, by } = req.body || {};
+  leads[idx] = {
+    ...leads[idx],
+    status: 'APPROVAL_PENDING',
+    isCorrection: true,
+    correctionNote: reason || '',
+    correctionBy:   by   || 'Hub Manager',
+    correctionAt:   new Date().toISOString(),
+    steps: [
+      { id: uuidv4(), name: 'Basic Details', status: 'in_progress', completedAt: null, completedBy: null },
+      { id: uuidv4(), name: 'Qualification', status: 'pending',     completedAt: null, completedBy: null },
+      { id: uuidv4(), name: 'Meet Lead',     status: 'pending',     completedAt: null, completedBy: null },
+    ],
+  };
+  res.json(leads[idx]);
 });
 
 // ── PATCH /api/leads/:id/steps/:stepId ────────────────────────

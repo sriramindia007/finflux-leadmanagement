@@ -56,6 +56,8 @@ export const api = {
   getWorkload: () => request('/leads/workload'),
   addNote: (id, data) => request(`/leads/${id}/notes`, { method: 'POST', body: JSON.stringify(data) }),
   startOver: (id, data) => request(`/leads/${id}/start-over`, { method: 'POST', body: JSON.stringify(data) }),
+  getBulkUploads: () => request('/bulk-uploads'),
+  getBulkUploadJob: (jobId) => request(`/bulk-uploads/${jobId}`),
   // Config microservice
   getConfig:      ()        => request('/config'),
   getConfigKey:   (key)     => request(`/config/${key}`),

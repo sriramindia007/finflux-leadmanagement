@@ -3,8 +3,8 @@ import { c, card, pill } from '../theme';
 import { api } from '../services/api';
 import StatusBadge from '../components/StatusBadge';
 
-const FILTERS = ['ALL','APPROVAL_PENDING','QUALIFIED','REJECTED','CONVERTED'];
-const LABELS = { ALL:'All', APPROVAL_PENDING:'Pending', QUALIFIED:'Qualified', REJECTED:'Rejected', CONVERTED:'Converted' };
+const FILTERS = ['ALL','CORRECTIONS','APPROVAL_PENDING','QUALIFIED','REJECTED','CONVERTED'];
+const LABELS = { ALL:'All', CORRECTIONS:'Corrections', APPROVAL_PENDING:'Pending', QUALIFIED:'Qualified', REJECTED:'Rejected', CONVERTED:'Converted' };
 
 function agingDays(createdAt) {
   return Math.floor((Date.now() - new Date(createdAt)) / 86400000);
@@ -44,14 +44,26 @@ export default function LeadsPoolScreen({ navigate, user }) {
 
   // Status counts across full base list
   const countByStatus = useMemo(() => {
-    const counts = { ALL: base.length };
-    FILTERS.slice(1).forEach(f => { counts[f] = base.filter(l => l.status === f).length; });
+    const counts = {
+      ALL: base.length,
+      CORRECTIONS: base.filter(l => l.isCorrection === true).length,
+    };
+    FILTERS.filter(f => f !== 'ALL' && f !== 'CORRECTIONS').forEach(f => {
+      counts[f] = base.filter(l => l.status === f).length;
+    });
     return counts;
   }, [base]);
 
   // Visible list: status chip + search
   const filtered = useMemo(() => {
-    let list = filter === 'ALL' ? base : base.filter(l => l.status === filter);
+    let list;
+    if (filter === 'ALL') {
+      list = base;
+    } else if (filter === 'CORRECTIONS') {
+      list = base.filter(l => l.isCorrection === true);
+    } else {
+      list = base.filter(l => l.status === filter);
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(l =>
@@ -91,11 +103,21 @@ export default function LeadsPoolScreen({ navigate, user }) {
 
       {/* Filter Tabs */}
       <div style={{ display:'flex', gap:8, padding:'0 16px 12px', overflowX:'auto', scrollbarWidth:'none' }}>
-        {FILTERS.map(f => (
-          <button key={f} style={pill(filter === f)} onClick={() => setFilter(f)}>
-            {LABELS[f]} <span style={{ fontSize:10, opacity:0.7 }}>({countByStatus[f] ?? 0})</span>
-          </button>
-        ))}
+        {FILTERS.map(f => {
+          const isCorrections = f === 'CORRECTIONS';
+          const hasCorrections = isCorrections && (countByStatus['CORRECTIONS'] ?? 0) > 0;
+          const correctionStyle = isCorrections && filter !== f ? {
+            border: '1.5px solid #F59E0B',
+            background: '#FFFBEB',
+            color: '#92400E',
+            fontWeight: 600,
+          } : {};
+          return (
+            <button key={f} style={{ ...pill(filter === f), ...(filter !== f ? correctionStyle : {}) }} onClick={() => setFilter(f)}>
+              {isCorrections && hasCorrections ? '⚠ ' : ''}{LABELS[f]} <span style={{ fontSize:10, opacity:0.7 }}>({countByStatus[f] ?? 0})</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* List */}
@@ -136,8 +158,9 @@ export default function LeadsPoolScreen({ navigate, user }) {
                         )}
                         <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
                           <StatusBadge status={lead.status} />
+                          {lead.isCorrection && <span style={{ fontSize:10, fontWeight:700, color:'#92400E', background:'#FEF3C7', borderRadius:40, padding:'2px 8px', border:'1px solid #F59E0B' }}>⚠ Correction</span>}
                           {lead.status === 'CONVERTED' && <span style={{ color:c.converted, fontWeight:700, fontSize:13 }}>+₹800</span>}
-                          {lead.status === 'APPROVAL_PENDING' && <span style={{ fontSize:11, color:c.pending }}>Awaiting hub review</span>}
+                          {lead.status === 'APPROVAL_PENDING' && !lead.isCorrection && <span style={{ fontSize:11, color:c.pending }}>Awaiting hub review</span>}
                         </div>
                         {lead.assignedTo && !myLeads && (
                           <div style={{ fontSize:11, color:c.textMuted, marginTop:3 }}>FO: {lead.assignedTo}</div>

@@ -6,6 +6,7 @@ import LeadDetailPage from './pages/LeadDetailPage';
 import CallLogsPage from './pages/CallLogsPage';
 import ConfigPage from './pages/ConfigPage';
 import ReportsPage from './pages/ReportsPage';
+import BulkUploadMonitorPage from './pages/BulkUploadMonitorPage';
 
 const DEFAULT_USER = { name: 'Hub Officer', role: 'Hub Team', branch: 'HQ', centre: '' };
 
@@ -32,6 +33,7 @@ export default function App() {
         <Route path="/collections" element={<Placeholder title="Collections" />} />
         <Route path="/customers" element={<Placeholder title="All Customers" />} />
         <Route path="/reports" element={<ReportsPage />} />
+        <Route path="/bulk-uploads" element={<BulkUploadMonitorPage />} />
       </Routes>
     </div>
   );
