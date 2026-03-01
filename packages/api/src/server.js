@@ -96,12 +96,19 @@ app.get('/api/leads', (req, res) => {
 
 // ── GET /api/leads/stats ───────────────────────────────────────
 app.get('/api/leads/stats', (req, res) => {
+  // Per-source breakdown
+  const sourceMap = {};
+  leads.forEach(l => {
+    const src = l.source || l.leadSource || 'Unknown';
+    sourceMap[src] = (sourceMap[src] || 0) + 1;
+  });
   res.json({
     total: leads.length,
     approvalPending: leads.filter(l => l.status === 'APPROVAL_PENDING').length,
     qualified: leads.filter(l => l.status === 'QUALIFIED').length,
     converted: leads.filter(l => l.status === 'CONVERTED').length,
     rejected: leads.filter(l => l.status === 'REJECTED').length,
+    bySource: sourceMap,
   });
 });
 
@@ -274,8 +281,15 @@ app.get('/api/leads/:id', (req, res) => {
 
 // ── POST /api/leads ────────────────────────────────────────────
 app.post('/api/leads', (req, res) => {
+  const body = req.body || {};
+  // Field Officers always produce Field Scouting leads — not overridable
+  const resolvedSource = body.createdByRole === 'Field Officer'
+    ? 'Field Scouting'
+    : (body.source || body.leadSource || 'Back Office');
   const newLead = {
-    ...req.body,
+    ...body,
+    source: resolvedSource,
+    leadSource: resolvedSource,
     id: String(Date.now()).padStart(12, '0'),
     createdAt: new Date().toISOString(),
     status: 'APPROVAL_PENDING',
@@ -367,6 +381,103 @@ app.post('/api/leads/:id/start-over', (req, res) => {
     ],
   };
   res.json(leads[idx]);
+});
+
+// ── CRM Integration Endpoints ─────────────────────────────────
+// Simple API-key middleware for CRM consumer authentication
+const CRM_API_KEY = process.env.CRM_API_KEY || 'crm-secret-key-2025';
+
+function requireCrmKey(req, res, next) {
+  const key = req.headers['x-api-key'];
+  if (!key || key !== CRM_API_KEY) {
+    return res.status(401).json({ error: 'Unauthorized — invalid or missing X-API-Key' });
+  }
+  next();
+}
+
+// POST /api/crm/leads — CRM pushes a new lead into the system
+app.post('/api/crm/leads', requireCrmKey, (req, res) => {
+  const {
+    externalId,         // CRM's own lead ID (for dedup + status check)
+    name, mobile, work,
+    leadType, loanAmount, loanPurpose,
+    pincode, state, district, taluka,
+    locality, notes,
+    branch, centre,
+    assignedTo,
+  } = req.body || {};
+
+  if (!name || String(name).trim().length < 2) {
+    return res.status(400).json({ error: 'name is required (min 2 characters)' });
+  }
+  if (!mobile || !/^[6-9]\d{9}$/.test(String(mobile))) {
+    return res.status(400).json({ error: 'mobile must be a valid 10-digit Indian number starting 6-9' });
+  }
+
+  // Dedup by mobile
+  const existing = leads.find(l => l.mobile === String(mobile));
+  if (existing) {
+    return res.status(409).json({ error: `Lead already exists with this mobile — Lead ID ${existing.id}` });
+  }
+
+  // Dedup by externalId
+  if (externalId) {
+    const byExtId = leads.find(l => l.crmExternalId === String(externalId));
+    if (byExtId) {
+      return res.status(409).json({ error: `Lead already exists for CRM external ID ${externalId} — Lead ID ${byExtId.id}` });
+    }
+  }
+
+  const newLead = {
+    id: String(Date.now()).padStart(12, '0'),
+    crmExternalId: externalId ? String(externalId) : null,
+    source: 'CRM',
+    leadSource: 'CRM',
+    createdBy: 'CRM Integration',
+    createdByRole: 'CRM',
+    createdAt: new Date().toISOString(),
+    status: 'APPROVAL_PENDING',
+    name: String(name).trim(),
+    mobile: String(mobile),
+    work: work || '',
+    leadType: leadType || 'Individual',
+    loanAmount: loanAmount ? Number(loanAmount) : 0,
+    loanPurpose: loanPurpose || '',
+    pincode: pincode || '',
+    state: state || '',
+    district: district || '',
+    taluka: taluka || '',
+    locality: locality || '',
+    notes: notes || '',
+    branch: branch || '',
+    centre: centre || '',
+    assignedTo: assignedTo || '',
+    steps: [
+      { id: uuidv4(), name: 'Basic Details', status: 'in_progress', completedAt: null, completedBy: null },
+      { id: uuidv4(), name: 'Qualification', status: 'pending',     completedAt: null, completedBy: null },
+      { id: uuidv4(), name: 'Meet Lead',     status: 'pending',     completedAt: null, completedBy: null },
+    ],
+    callLogs: [],
+    visitLogs: [],
+  };
+  leads.unshift(newLead);
+  res.status(201).json({ id: newLead.id, crmExternalId: newLead.crmExternalId, status: newLead.status });
+});
+
+// GET /api/crm/leads/:externalId — CRM polls status of a previously submitted lead
+app.get('/api/crm/leads/:externalId', requireCrmKey, (req, res) => {
+  const lead = leads.find(l => l.crmExternalId === req.params.externalId);
+  if (!lead) return res.status(404).json({ error: 'Lead not found for this CRM external ID' });
+  res.json({
+    id: lead.id,
+    crmExternalId: lead.crmExternalId,
+    name: lead.name,
+    mobile: lead.mobile,
+    status: lead.status,
+    assignedTo: lead.assignedTo || null,
+    createdAt: lead.createdAt,
+    updatedAt: lead.updatedAt || null,
+  });
 });
 
 // ── PATCH /api/leads/:id/steps/:stepId ────────────────────────

@@ -6,6 +6,23 @@ import StatusBadge from '../components/StatusBadge';
 const FILTERS = ['ALL','CORRECTIONS','APPROVAL_PENDING','QUALIFIED','REJECTED','CONVERTED'];
 const LABELS = { ALL:'All', CORRECTIONS:'Corrections', APPROVAL_PENDING:'Pending', QUALIFIED:'Qualified', REJECTED:'Rejected', CONVERTED:'Converted' };
 
+const SOURCE_STYLES = {
+  'Field Scouting': { icon: '📍', color: '#92400E', bg: '#FEF3C7', border: '#F59E0B' },
+  'CRM':            { icon: '🏢', color: '#6D28D9', bg: '#EDE9FE', border: '#A78BFA' },
+  'Back Office':    { icon: '🖥',  color: '#1E40AF', bg: '#DBEAFE', border: '#93C5FD' },
+  'Bulk Upload':    { icon: '📤', color: '#0E7490', bg: '#CFFAFE', border: '#67E8F9' },
+  'Inbound Call':   { icon: '📞', color: '#075985', bg: '#E0F2FE', border: '#7DD3FC' },
+  'Outbound Call':  { icon: '📣', color: '#065F46', bg: '#D1FAE5', border: '#6EE7B7' },
+};
+function SourceTag({ source }) {
+  const cfg = SOURCE_STYLES[source] || { icon: '🔗', color: '#374151', bg: '#F3F4F6', border: '#D1D5DB' };
+  return (
+    <span style={{ fontSize:10, fontWeight:700, color:cfg.color, background:cfg.bg, border:`1px solid ${cfg.border}`, borderRadius:40, padding:'2px 8px', display:'inline-flex', alignItems:'center', gap:3 }}>
+      <span style={{ fontSize:11 }}>{cfg.icon}</span>{source}
+    </span>
+  );
+}
+
 function agingDays(createdAt) {
   return Math.floor((Date.now() - new Date(createdAt)) / 86400000);
 }
@@ -158,6 +175,7 @@ export default function LeadsPoolScreen({ navigate, user }) {
                         )}
                         <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
                           <StatusBadge status={lead.status} />
+                          {(lead.source || lead.leadSource) && <SourceTag source={lead.source || lead.leadSource} />}
                           {lead.isCorrection && <span style={{ fontSize:10, fontWeight:700, color:'#92400E', background:'#FEF3C7', borderRadius:40, padding:'2px 8px', border:'1px solid #F59E0B' }}>⚠ Correction</span>}
                           {lead.status === 'CONVERTED' && <span style={{ color:c.converted, fontWeight:700, fontSize:13 }}>+₹800</span>}
                           {lead.status === 'APPROVAL_PENDING' && !lead.isCorrection && <span style={{ fontSize:11, color:c.pending }}>Awaiting hub review</span>}

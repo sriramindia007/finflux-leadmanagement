@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge';
+import SourceBadge from '../components/SourceBadge';
 import AddCallLogDrawer from '../components/AddCallLogDrawer';
 import { api } from '../services/api';
 
@@ -447,7 +448,7 @@ export default function LeadDetailPage() {
     'Lead Type': lead.leadType,
     'Lead Source': lead.leadSource,
     'Created By': lead.createdBy ? `${lead.createdBy}${lead.createdByRole ? ` (${lead.createdByRole})` : ''}` : '',
-    'Created Via': lead.source === 'Field Scouting' || lead.createdByRole === 'Field Officer' ? '📱 Mobile App' : '🖥 Web',
+    'Created Via': (lead.source === 'Field Scouting' || lead.createdByRole === 'Field Officer') ? '📱 Mobile App' : lead.source === 'CRM' ? '🏢 CRM Integration' : lead.source === 'Bulk Upload' ? '📤 Bulk Upload' : '🖥 Web',
     'Created On': lead.createdAt ? new Date(lead.createdAt).toLocaleDateString('en-IN') : '',
     'Loan Amount': lead.loanAmount ? `₹ ${Number(lead.loanAmount).toLocaleString('en-IN')}` : '',
     'Loan Purpose': lead.loanPurpose,
@@ -476,7 +477,10 @@ export default function LeadDetailPage() {
           <div style={{ fontSize: 13, color: '#6B7280' }}>{lead.leadType} Lead</div>
           <div style={{ fontSize: 12, color: '#9CA3AF' }}>ID: {lead.id}</div>
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {(lead.source || lead.leadSource) && (
+            <SourceBadge source={lead.source || lead.leadSource} />
+          )}
           <StatusBadge status={lead.status} />
         </div>
       </div>

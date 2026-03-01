@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge';
+import SourceBadge from '../components/SourceBadge';
 import NewLeadDrawer from '../components/NewLeadDrawer';
 import BulkUploadModal from '../components/BulkUploadModal';
 import { api } from '../services/api';
@@ -366,7 +367,11 @@ export default function LeadsPoolPage({ user }) {
                   <td style={s.td}>
                     {lead.leadType ? <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: '#EDE9FE', color: '#7C3AED', fontWeight: 600 }}>{lead.leadType}</span> : <span style={{ color: '#CFD6DD' }}>—</span>}
                   </td>
-                  <td style={s.td}>{lead.source || lead.leadSource || <span style={{ color: '#CFD6DD' }}>—</span>}</td>
+                  <td style={s.td}>
+                    {(lead.source || lead.leadSource)
+                      ? <SourceBadge source={lead.source || lead.leadSource} small />
+                      : <span style={{ color: '#CFD6DD' }}>—</span>}
+                  </td>
                   <td style={{ ...s.td, minWidth: 160 }}>
                     {(lead.branch || lead.office) ? (
                       <div style={{ lineHeight: 1.5 }}>
