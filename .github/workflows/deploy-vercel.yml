@@ -76,4 +76,7 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_LANDING }}
         working-directory: packages/landing
-        run: vercel deploy --prod --token $VERCEL_TOKEN --yes
+        run: |
+          DEPLOY_URL=$(vercel deploy --prod --token $VERCEL_TOKEN --yes)
+          echo "Deployed to: $DEPLOY_URL"
+          vercel alias set $DEPLOY_URL finflux-platform.vercel.app --token $VERCEL_TOKEN --scope srirams-projects-08741674 || true
